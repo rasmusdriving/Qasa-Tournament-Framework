@@ -12,8 +12,12 @@ import math
 import random
 import os
 import logging
+from dotenv import load_dotenv
 
 from brackets.models import Base, Tournament, Team, Bet, Round, Match, MatchStatus, Player
+
+# Load .env file if it exists
+load_dotenv()
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
@@ -22,10 +26,10 @@ logger = logging.getLogger(__name__)
 # Database setup
 DATABASE_URL = os.getenv("DATABASE_URL")
 
-if DATABASE_URL:
-    SQLALCHEMY_DATABASE_URL = DATABASE_URL.replace('postgres://', 'postgresql://')
-else:
+if not DATABASE_URL:
     raise Exception("DATABASE_URL environment variable is not set")
+
+SQLALCHEMY_DATABASE_URL = DATABASE_URL.replace('postgres://', 'postgresql://')
 
 def get_db_connection():
     retries = 5
@@ -327,41 +331,41 @@ async def generate_bracket(tournament_id: int, db: Session = Depends(get_db)):
     return {"message": "Bracket generated successfully"}
 
 @app.post("/admin/update_match/{match_id}")
-async def update_match(
-    match_id: int, 
-    winner_name: str = Body(...), 
-    team1_score: int = Body(...), 
-    team2_score: int = Body(...), 
-    db: Session = Depends(get_db)
-):
+async def update_match(match_id: int, data: dict = Body(...), db: Session = Depends(get_db)):
     match = db.query(Match).filter(Match.id == match_id).first()
     if not match:
         raise HTTPException(status_code=404, detail="Match not found")
 
-    winner = db.query(Team).filter((Team.id == match.team1_id) | (Team.id == match.team2_id), Team.name == winner_name).first()
-    if not winner:
-        raise HTTPException(status_code=400, detail="Invalid winner")
+    if 'team1_score' in data:
+        match.team1_score = data['team1_score']
+    if 'team2_score' in data:
+        match.team2_score = data['team2_score']
+    
+    if 'winner_name' in data and data['winner_name']:
+        winner = db.query(Team).filter(Team.name == data['winner_name']).first()
+        if winner:
+            match.winner = winner
+            match.is_ongoing = False  # Remove ongoing status when a winner is selected
 
-    match.winner_id = winner.id
-    match.team1_score = team1_score
-    match.team2_score = team2_score
-    match.status = MatchStatus.COMPLETED
+            # Update the next round's match
+            next_round = db.query(Round).filter(Round.tournament_id == match.round.tournament_id, 
+                                                Round.number == match.round.number + 1).first()
+            if next_round:
+                next_match_position = match.position // 2
+                next_match = db.query(Match).filter(Match.round_id == next_round.id, 
+                                                    Match.position == next_match_position).first()
+                if next_match:
+                    if match.position % 2 == 0:
+                        next_match.team1 = winner
+                    else:
+                        next_match.team2 = winner
+        else:
+            raise HTTPException(status_code=400, detail="Winner team not found")
+    elif 'winner_name' in data and not data['winner_name']:
+        match.winner = None  # Clear the winner if an empty string is sent
+
     db.commit()
-
-    # Advance winner to next round
-    next_round = db.query(Round).filter(Round.tournament_id == match.round.tournament_id, Round.number == match.round.number + 1).first()
-    if next_round:
-        next_match_position = match.position // 2
-        next_match = db.query(Match).filter(Match.round_id == next_round.id, Match.position == next_match_position).first()
-        
-        if next_match:
-            if next_match.team1_id is None:
-                next_match.team1_id = winner.id
-            else:
-                next_match.team2_id = winner.id
-            db.commit()
-
-    return JSONResponse(content={"message": "Match updated successfully"})
+    return {"success": True, "message": "Match updated successfully"}
 
 @app.get("/tournament/{tournament_id}/bracket")
 async def get_tournament_bracket(tournament_id: int, db: Session = Depends(get_db)):
@@ -386,8 +390,9 @@ async def get_tournament_bracket(tournament_id: int, db: Session = Depends(get_d
                     "team1_score": match.team1_score,
                     "team2_score": match.team2_score,
                     "winner": match.winner.name if match.winner else None,
+                    "winner_id": match.winner.id if match.winner else None,
                     "position": match.position,
-                    "is_ongoing": match.is_ongoing  # Add this line
+                    "is_ongoing": match.is_ongoing
                 }
                 for match in matches
             ]
@@ -506,3 +511,8 @@ async def toggle_ongoing_match(match_id: int, data: dict = Body(...), db: Sessio
     match.is_ongoing = is_ongoing
     db.commit()
     return {"success": True}
+
+if __name__ == "__main__":
+    import uvicorn
+    port = int(os.getenv("PORT", 8000))
+    uvicorn.run("main:app", host="0.0.0.0", port=port, reload=True)

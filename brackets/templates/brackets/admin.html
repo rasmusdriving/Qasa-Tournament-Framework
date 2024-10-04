@@ -269,6 +269,7 @@
             const team1Score = document.getElementById(`team1-score-${matchId}`).value;
             const team2Score = document.getElementById(`team2-score-${matchId}`).value;
             const saveIndicator = document.getElementById(`save-indicator-${matchId}`);
+            const ongoingCheckbox = document.getElementById(`ongoing-${matchId}`);
 
             saveIndicator.style.display = 'none';
 
@@ -294,6 +295,14 @@
                     setTimeout(() => {
                         saveIndicator.style.display = 'none';
                     }, 2000);
+
+                    // Update ongoing status
+                    if (winnerName) {
+                        ongoingCheckbox.checked = false;
+                        ongoingCheckbox.disabled = true;
+                    } else {
+                        ongoingCheckbox.disabled = false;
+                    }
                 })
                 .catch(error => {
                     console.error('Error:', error);
