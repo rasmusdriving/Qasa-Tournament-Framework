@@ -1,0 +1,382 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tournament Tracker</title>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <style>
+        body {
+            background-color: #121212;
+            font-family: 'Arial', sans-serif;
+            color: #e0e0e0;
+        }
+
+        .bracket {
+            display: flex;
+            justify-content: flex-start;
+            padding: 20px;
+            overflow-x: auto;
+            background-color: #1e1e1e;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+            position: relative;
+        }
+
+        .round {
+            display: flex;
+            flex-direction: column;
+            margin-right: 80px;
+            position: relative;
+        }
+
+        .round-title {
+            font-size: 18px;
+            font-weight: bold;
+            color: #bb86fc;
+            text-align: center;
+            margin-bottom: 20px;
+            text-transform: uppercase;
+        }
+
+        .match {
+            background-color: #2c2c2c;
+            border: 2px solid #3d3d3d;
+            border-radius: 8px;
+            padding: 10px;
+            margin-bottom: 20px;
+            width: 220px;
+            position: relative;
+            transition: all 0.3s ease;
+        }
+
+        .match:hover {
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+        }
+
+        .team {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            color: #e0e0e0;
+            margin-bottom: 5px;
+            padding: 5px;
+            border-radius: 4px;
+        }
+
+        .team.winner {
+            background-color: #1e4d3e;
+        }
+
+        .team-name {
+            font-weight: bold;
+        }
+
+        .team-score {
+            font-weight: bold;
+            color: #03dac6;
+        }
+
+        .connector {
+            stroke: #03dac6;
+            stroke-width: 2px;
+            fill: none;
+        }
+
+        .match-details {
+            display: none;
+            position: fixed;
+            background-color: #1e1e1e;
+            border: 1px solid #3d3d3d;
+            padding: 20px;
+            z-index: 1000;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.4);
+            max-width: 690px;
+            max-height: 80vh;
+            overflow-y: auto;
+            border-radius: 8px;
+        }
+
+        .match:hover .match-details {
+            display: block;
+        }
+
+        .player-image {
+            width: 150px;
+            height: 208px;
+            object-fit: cover;
+            margin-right: 10px;
+            margin-bottom: 10px;
+            border-radius: 4px;
+        }
+
+        .match-teams {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 15px;
+        }
+
+        .team-info {
+            width: 48%;
+            text-align: center;
+        }
+
+        .team-name {
+            font-weight: bold;
+            font-size: 1.2em;
+            margin-bottom: 10px;
+        }
+
+        .team-players {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            margin-bottom: 15px;
+        }
+
+        .bet-button {
+            width: 100%;
+            background-color: #03dac6;
+            border: none;
+            color: #121212;
+            padding: 10px 0;
+            text-align: center;
+            text-decoration: none;
+            display: inline-block;
+            font-size: 16px;
+            margin-top: 10px;
+            cursor: pointer;
+            border-radius: 4px;
+            transition: background-color 0.3s;
+        }
+
+        .bet-button:hover {
+            background-color: #018786;
+        }
+    </style>
+</head>
+
+<body class="bg-gray-900">
+    <div class="container mx-auto px-4 py-8">
+        <h1 class="text-4xl font-bold mb-8 text-center text-purple-400">Tournament Tracker</h1>
+        {% if tournament %}
+        <h2 class="text-2xl font-semibold mb-6 text-center text-gray-300">{{ tournament.name }}</h2>
+
+        <div id="bracket" class="bracket mb-8"></div>
+
+        <div class="mt-12">
+            <h3 class="text-2xl font-semibold mb-4 text-center text-gray-300">Current Odds</h3>
+            <div id="odds-list" class="bg-gray-800 rounded-lg shadow-md p-6">
+                {% for team, odd in odds.items() %}
+                <div class="flex justify-between items-center py-2 border-b border-gray-700 last:border-b-0">
+                    <span class="font-semibold text-gray-300">{{ team }}</span>
+                    <span class="text-purple-400 font-bold">{{ odd }}</span>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        <script>
+            let currentOpenMatchId = null;
+
+            function updateOdds() {
+                $.getJSON("/odds/{{ tournament.id }}", function (data) {
+                    var oddsList = $("#odds-list");
+                    oddsList.empty();
+                    $.each(data, function (team, odd) {
+                        oddsList.append(`
+                            <div class="flex justify-between items-center py-2 border-b border-gray-200 last:border-b-0">
+                                <span class="font-semibold">${team}</span>
+                                <span class="text-blue-600 font-bold">${odd}</span>
+                            </div>
+                        `);
+                    });
+                });
+            }
+
+            function updateBracket() {
+                $.getJSON("/tournament/{{ tournament.id }}/bracket", function (data) {
+                    var bracket = $("#bracket");
+                    bracket.empty();
+
+                    // Create SVG element for connectors
+                    var svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+                    svg.setAttribute("width", "100%");
+                    svg.setAttribute("height", "100%");
+                    svg.style.position = "absolute";
+                    svg.style.top = "0";
+                    svg.style.left = "0";
+                    svg.style.pointerEvents = "none";
+                    bracket.append(svg);
+
+                    data.bracket.forEach(function (round, roundIndex) {
+                        var roundElement = $('<div class="round"></div>');
+                        roundElement.append(`<h3 class="round-title">Round ${round.round_number}</h3>`);
+
+                        round.matches.sort((a, b) => a.position - b.position);
+
+                        round.matches.forEach(function (match, matchIndex) {
+                            var matchElement = $('<div class="match"></div>');
+                            matchElement.append(`
+                                <div class="team ${match.winner === match.team1 ? 'winner' : ''}">
+                                    <span class="team-name">${match.team1 || 'TBD'}</span>
+                                    <span class="team-score">${match.team1_score}</span>
+                                </div>
+                                <div class="team ${match.winner === match.team2 ? 'winner' : ''}">
+                                    <span class="team-name">${match.team2 || 'TBD'}</span>
+                                    <span class="team-score">${match.team2_score}</span>
+                                </div>
+                            `);
+
+                            var detailsElement = $('<div class="match-details"></div>');
+                            detailsElement.append(`
+                                <div class="match-teams">
+                                    <div class="team-info">
+                                        <div class="team-name">${match.team1 || 'TBD'}</div>
+                                        <div class="team-players" id="team1-players-${match.id}"></div>
+                                        <button class="bet-button" onclick="placeBet(${match.id}, ${match.team1_id}, '${match.team1}')">Bet on ${match.team1}</button>
+                                    </div>
+                                    <div class="team-info">
+                                        <div class="team-name">${match.team2 || 'TBD'}</div>
+                                        <div class="team-players" id="team2-players-${match.id}"></div>
+                                        <button class="bet-button" onclick="placeBet(${match.id}, ${match.team2_id}, '${match.team2}')">Bet on ${match.team2}</button>
+                                    </div>
+                                </div>
+                            `);
+
+                            matchElement.append(detailsElement);
+                            matchElement.attr('data-match-id', match.id);
+                            roundElement.append(matchElement);
+
+                            // Add event listeners for showing/hiding details
+                            matchElement.on('mouseenter', function (e) {
+                                showMatchDetails(match.id);
+                            });
+
+                            matchElement.on('mouseleave', function (e) {
+                                hideMatchDetails(match.id);
+                            });
+
+                            // Fetch and display player details
+                            $.getJSON(`/match/${match.id}`, function (matchDetails) {
+                                updatePlayerDetails(matchDetails);
+                            }).fail(function () {
+                                console.error('Failed to fetch match details for match ID:', match.id);
+                            });
+                        });
+
+                        bracket.append(roundElement);
+                    });
+
+                    // Draw connectors after all rounds and matches are added
+                    setTimeout(function () {
+                        $('.round').each(function (roundIndex, roundElement) {
+                            if (roundIndex < data.bracket.length - 1) {
+                                var nextRound = $(roundElement).next('.round');
+
+                                $(roundElement).find('.match').each(function (matchIndex, matchElement) {
+                                    var nextMatchIndex = Math.floor(matchIndex / 2);
+                                    var nextMatch = nextRound.find(`.match:eq(${nextMatchIndex})`);
+
+                                    if (nextMatch.length) {
+                                        var startRect = matchElement.getBoundingClientRect();
+                                        var endRect = nextMatch[0].getBoundingClientRect();
+                                        var bracketRect = bracket[0].getBoundingClientRect();
+
+                                        var startX = startRect.right - bracketRect.left;
+                                        var startY = startRect.top + (startRect.height / 2) - bracketRect.top;
+                                        var endX = endRect.left - bracketRect.left;
+                                        var endY = endRect.top + (endRect.height / 2) - bracketRect.top;
+
+                                        var midX = startX + (endX - startX) / 2;
+
+                                        var path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+                                        path.setAttribute("d", `M${startX},${startY} C${midX},${startY} ${midX},${endY} ${endX},${endY}`);
+                                        path.setAttribute("class", "connector");
+                                        svg.appendChild(path);
+                                    }
+                                });
+                            }
+                        });
+                    }, 0);
+
+                    // If a match details popup was open, keep it open
+                    if (currentOpenMatchId) {
+                        showMatchDetails(currentOpenMatchId);
+                    }
+                });
+            }
+
+            function showMatchDetails(matchId) {
+                currentOpenMatchId = matchId;
+                var details = $(`.match[data-match-id="${matchId}"] .match-details`);
+                var rect = $(`.match[data-match-id="${matchId}"]`)[0].getBoundingClientRect();
+                details.css({
+                    display: 'block',
+                    top: rect.bottom + window.scrollY + 'px',
+                    left: rect.left + window.scrollX + 'px'
+                });
+            }
+
+            function hideMatchDetails(matchId) {
+                currentOpenMatchId = null;
+                var details = $(`.match[data-match-id="${matchId}"] .match-details`);
+                details.css('display', 'none');
+            }
+
+            function updatePlayerDetails(matchDetails) {
+                var team1Players = $(`#team1-players-${matchDetails.id}`);
+                var team2Players = $(`#team2-players-${matchDetails.id}`);
+
+                team1Players.empty();
+                team2Players.empty();
+
+                if (matchDetails.team1.players.length > 0) {
+                    matchDetails.team1.players.forEach(function (player) {
+                        team1Players.append(`<img src="/static/player_images/${player.name}.png" alt="${player.name}" class="player-image" title="${player.name}">`);
+                    });
+                } else {
+                    team1Players.append('<p>No players</p>');
+                }
+
+                if (matchDetails.team2.players.length > 0) {
+                    matchDetails.team2.players.forEach(function (player) {
+                        team2Players.append(`<img src="/static/player_images/${player.name}.png" alt="${player.name}" class="player-image" title="${player.name}">`);
+                    });
+                } else {
+                    team2Players.append('<p>No players</p>');
+                }
+            }
+
+            function placeBet(matchId, teamId, teamName) {
+                var amount = prompt(`Enter bet amount in SEK for ${teamName}:`);
+                var fullName = prompt("Enter your full name:");
+
+                if (amount && fullName) {
+                    $.post(`/place_bet/${matchId}/${teamId}`, { amount: amount, full_name: fullName })
+                        .done(function (data) {
+                            alert(data.message);
+                            updateOdds();
+                        })
+                        .fail(function (jqXHR) {
+                            alert("Error placing bet: " + jqXHR.responseJSON.detail);
+                        });
+                }
+            }
+
+            $(document).ready(function () {
+                updateBracket();
+                setInterval(updateBracket, 5000);  // Update every 5 seconds
+            });
+
+            setInterval(updateOdds, 5000);
+            updateBracket(); // Initial load
+        </script>
+        {% else %}
+        <p class="text-xl text-center text-gray-600">{{ message }}</p>
+        {% endif %}
+    </div>
+</body>
+
+</html>
