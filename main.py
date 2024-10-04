@@ -11,22 +11,35 @@ from sqlalchemy.exc import OperationalError
 import math
 import random
 import os
+import logging
 
 from brackets.models import Base, Tournament, Team, Bet, Round, Match, MatchStatus, Player
 
+# Set up logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
 # Database setup
-SQLALCHEMY_DATABASE_URL = "postgresql://postgres:postgres@db/tournament_tracker"
+DB_USER = os.getenv("DB_USER", "postgres")
+DB_PASSWORD = os.getenv("DB_PASSWORD", "postgres")
+DB_HOST = os.getenv("DB_HOST", "db")
+DB_NAME = os.getenv("DB_NAME", "tournament_tracker")
+SQLALCHEMY_DATABASE_URL = f"postgresql://{DB_USER}:{DB_PASSWORD}@{DB_HOST}/{DB_NAME}"
 
 def get_db_connection():
     retries = 5
     while retries > 0:
         try:
+            logger.info(f"Attempting to connect to database: {SQLALCHEMY_DATABASE_URL}")
             engine = create_engine(SQLALCHEMY_DATABASE_URL)
             Base.metadata.create_all(bind=engine)
+            logger.info("Successfully connected to the database")
             return engine
-        except OperationalError:
+        except OperationalError as e:
+            logger.error(f"Failed to connect to the database: {str(e)}")
             retries -= 1
             time.sleep(2)
+    logger.critical("Could not connect to the database after multiple attempts")
     raise Exception("Could not connect to the database")
 
 engine = get_db_connection()
