@@ -49,11 +49,12 @@
             margin-bottom: 20px;
             width: 220px;
             position: relative;
-            transition: all 0.3s ease;
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
         }
 
         .match:hover {
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+            transform: scale(1.05);
+            box-shadow: 0 8px 16px rgba(0, 0, 0, 0.3);
         }
 
         .team {
@@ -99,8 +100,21 @@
             border-radius: 8px;
         }
 
-        .match:hover .match-details {
-            display: block;
+        .match-details-popup {
+            display: none;
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background-color: #1e1e1e;
+            border: 1px solid #3d3d3d;
+            padding: 20px;
+            z-index: 1000;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.4);
+            max-width: 80%;
+            max-height: 80vh;
+            overflow-y: auto;
+            border-radius: 8px;
         }
 
         .player-image {
@@ -192,6 +206,17 @@
             }
         }
 
+        .overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            z-index: 999;
+        }
+
         /* Remove the .loading class and its animation */
     </style>
 </head>
@@ -217,6 +242,8 @@
         </div>
         <script>
             let currentOpenMatchId = null;
+            let popupElement = null;
+            let overlayElement = null;
 
             function updateOdds() {
                 $.getJSON("/odds/{{ tournament.id }}", function (data) {
@@ -291,21 +318,15 @@
                             matchElement.attr('data-match-id', match.id);
                             roundElement.append(matchElement);
 
-                            // Add event listeners for showing/hiding details
-                            matchElement.on('mouseenter', function (e) {
-                                showMatchDetails(match.id);
+                            matchElement.on('click', function (e) {
+                                e.stopPropagation();
+                                toggleMatchDetails(match.id);
                             });
 
-                            matchElement.on('mouseleave', function (e) {
-                                hideMatchDetails(match.id);
-                            });
-
-                            // Fetch and display player details
-                            $.getJSON(`/match/${match.id}`, function (matchDetails) {
-                                updatePlayerDetails(matchDetails);
-                            }).fail(function () {
-                                console.error('Failed to fetch match details for match ID:', match.id);
-                            });
+                            // Only fetch player details if this match is currently open
+                            if (currentOpenMatchId === match.id) {
+                                updatePlayerDetails(match);
+                            }
                         });
 
                         bracket.append(roundElement);
@@ -343,51 +364,94 @@
                         });
                     }, 0);
 
-                    // If a match details popup was open, keep it open
+                    // Update the popup content if it's open
                     if (currentOpenMatchId) {
-                        showMatchDetails(currentOpenMatchId);
+                        updatePopupContent(currentOpenMatchId);
                     }
                 });
             }
 
+            function toggleMatchDetails(matchId) {
+                if (currentOpenMatchId === matchId) {
+                    hideMatchDetails();
+                } else {
+                    showMatchDetails(matchId);
+                }
+            }
+
             function showMatchDetails(matchId) {
                 currentOpenMatchId = matchId;
-                var details = $(`.match[data-match-id="${matchId}"] .match-details`);
-                var rect = $(`.match[data-match-id="${matchId}"]`)[0].getBoundingClientRect();
-                details.css({
-                    display: 'block',
-                    top: rect.bottom + window.scrollY + 'px',
-                    left: rect.left + window.scrollX + 'px'
+
+                if (!popupElement) {
+                    popupElement = $('<div class="match-details-popup"></div>');
+                    $('body').append(popupElement);
+                }
+
+                if (!overlayElement) {
+                    overlayElement = $('<div class="overlay"></div>');
+                    $('body').append(overlayElement);
+                }
+
+                updatePopupContent(matchId);
+
+                overlayElement.fadeIn(300);
+                popupElement.fadeIn(300);
+
+                // Add click event to close popup when clicking outside
+                overlayElement.on('click', hideMatchDetails);
+            }
+
+            function updatePopupContent(matchId) {
+                var matchElement = $(`.match[data-match-id="${matchId}"]`);
+                var details = matchElement.find('.match-details').clone();
+
+                // Update the content of the popup
+                popupElement.html(details.html());
+
+                // Fetch and update player details
+                $.getJSON(`/match/${matchId}`, function (matchDetails) {
+                    updatePlayerDetails(matchDetails);
+                }).fail(function () {
+                    console.error('Failed to fetch match details for match ID:', matchId);
                 });
             }
 
-            function hideMatchDetails(matchId) {
+            function hideMatchDetails() {
                 currentOpenMatchId = null;
-                var details = $(`.match[data-match-id="${matchId}"] .match-details`);
-                details.css('display', 'none');
+                if (popupElement) {
+                    popupElement.fadeOut(300);
+                }
+                if (overlayElement) {
+                    overlayElement.fadeOut(300);
+                    // Remove click event when hiding
+                    overlayElement.off('click');
+                }
             }
 
             function updatePlayerDetails(matchDetails) {
-                var team1Players = $(`#team1-players-${matchDetails.id}`);
-                var team2Players = $(`#team2-players-${matchDetails.id}`);
+                var team1Players = popupElement.find(`#team1-players-${matchDetails.id}`);
+                var team2Players = popupElement.find(`#team2-players-${matchDetails.id}`);
 
-                team1Players.empty();
-                team2Players.empty();
+                updateTeamPlayers(team1Players, matchDetails.team1.players);
+                updateTeamPlayers(team2Players, matchDetails.team2.players);
+            }
 
-                if (matchDetails.team1.players.length > 0) {
-                    matchDetails.team1.players.forEach(function (player) {
-                        team1Players.append(`<img src="/static/player_images/${player.name}.png" alt="${player.name}" class="player-image" title="${player.name}">`);
+            function updateTeamPlayers(teamElement, players) {
+                if (players.length > 0) {
+                    players.forEach(function (player) {
+                        var playerImage = teamElement.find(`img[alt="${player.name}"]`);
+                        if (playerImage.length === 0) {
+                            teamElement.append(`<img src="/static/player_images/${player.name}.png" alt="${player.name}" class="player-image" title="${player.name}">`);
+                        }
+                    });
+                    // Remove any extra player images
+                    teamElement.find('img').each(function () {
+                        if (!players.some(player => player.name === $(this).attr('alt'))) {
+                            $(this).remove();
+                        }
                     });
                 } else {
-                    team1Players.append('<p>No players</p>');
-                }
-
-                if (matchDetails.team2.players.length > 0) {
-                    matchDetails.team2.players.forEach(function (player) {
-                        team2Players.append(`<img src="/static/player_images/${player.name}.png" alt="${player.name}" class="player-image" title="${player.name}">`);
-                    });
-                } else {
-                    team2Players.append('<p>No players</p>');
+                    teamElement.html('<p>No players</p>');
                 }
             }
 
