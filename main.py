@@ -20,16 +20,12 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # Database setup
-DB_USER = os.getenv("DB_USER", "postgres")
-DB_PASSWORD = os.getenv("DB_PASSWORD", "postgres")
-DB_HOST = os.getenv("DB_HOST", "db")
-DB_NAME = os.getenv("DB_NAME", "tournament_tracker")
 DATABASE_URL = os.getenv("DATABASE_URL")
 
 if DATABASE_URL:
     SQLALCHEMY_DATABASE_URL = DATABASE_URL.replace('postgres://', 'postgresql://')
 else:
-    SQLALCHEMY_DATABASE_URL = f"postgresql://{DB_USER}:{DB_PASSWORD}@{DB_HOST}/{DB_NAME}"
+    raise Exception("DATABASE_URL environment variable is not set")
 
 def get_db_connection():
     retries = 5

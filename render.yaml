@@ -9,22 +9,6 @@ services:
         fromDatabase:
           name: tournament-tracker-db
           property: connectionString
-      - key: DB_USER
-        fromDatabase:
-          name: tournament-tracker-db
-          property: user
-      - key: DB_PASSWORD
-        fromDatabase:
-          name: tournament-tracker-db
-          property: password
-      - key: DB_HOST
-        fromDatabase:
-          name: tournament-tracker-db
-          property: host
-      - key: DB_NAME
-        fromDatabase:
-          name: tournament-tracker-db
-          property: database
 
 databases:
   - name: tournament-tracker-db
