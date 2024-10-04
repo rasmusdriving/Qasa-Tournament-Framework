@@ -1,0 +1,32 @@
+services:
+  - type: web
+    name: tournament-tracker
+    env: docker
+    buildCommand: docker-compose build
+    startCommand: docker-compose up
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: tournament-tracker-db
+          property: connectionString
+      - key: DB_USER
+        fromDatabase:
+          name: tournament-tracker-db
+          property: user
+      - key: DB_PASSWORD
+        fromDatabase:
+          name: tournament-tracker-db
+          property: password
+      - key: DB_HOST
+        fromDatabase:
+          name: tournament-tracker-db
+          property: host
+      - key: DB_NAME
+        fromDatabase:
+          name: tournament-tracker-db
+          property: database
+
+databases:
+  - name: tournament-tracker-db
+    databaseName: tournament_tracker
+    user: tournament_tracker

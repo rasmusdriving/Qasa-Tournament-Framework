@@ -5,14 +5,18 @@ services:
     build: .
     command: >
       sh -c "alembic upgrade head &&
-             uvicorn main:app --host 0.0.0.0 --port 8000 --reload"
+             uvicorn main:app --host 0.0.0.0 --port $PORT --reload"
     volumes:
       - .:/app
       - ./static:/app/static
     ports:
-      - "8000:8000"
-    depends_on:
-      - db
+      - "$PORT:$PORT"
+    environment:
+      - DATABASE_URL=${DATABASE_URL}
+      - DB_USER=${DB_USER}
+      - DB_PASSWORD=${DB_PASSWORD}
+      - DB_HOST=${DB_HOST}
+      - DB_NAME=${DB_NAME}
   db:
     image: postgres:13
     environment:

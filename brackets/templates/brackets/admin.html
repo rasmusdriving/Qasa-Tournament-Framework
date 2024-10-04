@@ -62,12 +62,23 @@
                     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                         {% for team in tournament.teams %}
                         <div class="bg-gray-100 p-4 rounded-md">
-                            <h5 class="font-medium mb-2">{{ team.name }}</h5>
-                            <ul class="list-disc list-inside">
+                            <h5 class="font-medium mb-2">
+                                <span class="team-name" data-team-id="{{ team.id }}">{{ team.name }}</span>
+                                <button class="edit-team-btn text-blue-500 hover:text-blue-700 ml-2"
+                                    onclick="editTeam({{ team.id }})">Edit</button>
+                            </h5>
+                            <ul class="list-disc list-inside" id="team-players-{{ team.id }}">
                                 {% for player in team.players %}
-                                <li>{{ player.name }}</li>
+                                <li>
+                                    <span class="player-name">{{ player.name }}</span>
+                                    <button class="remove-player-btn text-red-500 hover:text-red-700 ml-2"
+                                        onclick="removePlayer({{ team.id }}, {{ player.id }})">Remove</button>
+                                </li>
                                 {% endfor %}
                             </ul>
+                            <button
+                                class="add-player-btn bg-green-500 hover:bg-green-700 text-white font-bold py-1 px-2 rounded mt-2"
+                                onclick="addPlayer({{ team.id }})">Add Player</button>
                         </div>
                         {% endfor %}
                     </div>
@@ -238,6 +249,12 @@
                                     </select>
                                     <span class="save-indicator" id="save-indicator-${match.id}">Saved</span>
                                 </div>
+                                <div class="mt-2">
+                                    <label>
+                                        <input type="checkbox" id="ongoing-${match.id}" onchange="toggleOngoingMatch(${match.id})" ${match.is_ongoing ? 'checked' : ''}>
+                                        Currently Ongoing
+                                    </label>
+                                </div>
                             `;
                             roundElement.appendChild(matchElement);
                         });
@@ -300,6 +317,117 @@
             newInput.required = true;
             newInput.className = 'w-full px-3 py-2 border rounded mt-2';
             playerInputs.appendChild(newInput);
+        }
+
+        function editTeam(teamId) {
+            const teamNameElement = document.querySelector(`.team-name[data-team-id="${teamId}"]`);
+            const currentName = teamNameElement.textContent;
+            const newName = prompt("Enter new team name:", currentName);
+            if (newName && newName !== currentName) {
+                fetch(`/admin/edit_team/${teamId}`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ name: newName }),
+                })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.success) {
+                            teamNameElement.textContent = newName;
+                        } else {
+                            alert('Error updating team name');
+                        }
+                    })
+                    .catch(error => console.error('Error:', error));
+            }
+        }
+
+        function addPlayer(teamId) {
+            const playerName = prompt("Enter new player name:");
+            if (playerName) {
+                fetch(`/admin/add_player/${teamId}`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ name: playerName }),
+                })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.success) {
+                            const playersList = document.getElementById(`team-players-${teamId}`);
+                            const newPlayerItem = document.createElement('li');
+                            newPlayerItem.innerHTML = `
+                            <span class="player-name">${playerName}</span>
+                            <button class="remove-player-btn text-red-500 hover:text-red-700 ml-2" onclick="removePlayer(${teamId}, ${data.playerId})">Remove</button>
+                        `;
+                            playersList.appendChild(newPlayerItem);
+                        } else {
+                            alert('Error adding player');
+                        }
+                    })
+                    .catch(error => console.error('Error:', error));
+            }
+        }
+
+        function removePlayer(teamId, playerId) {
+            if (confirm('Are you sure you want to remove this player?')) {
+                fetch(`/admin/remove_player/${teamId}/${playerId}`, {
+                    method: 'POST',
+                })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.success) {
+                            const playersList = document.getElementById(`team-players-${teamId}`);
+                            const playerItem = playersList.querySelector(`li:has(button[onclick="removePlayer(${teamId}, ${playerId})"])`);
+                            playerItem.remove();
+                        } else {
+                            alert('Error removing player');
+                        }
+                    })
+                    .catch(error => console.error('Error:', error));
+            }
+        }
+
+        function toggleOngoingMatch(matchId) {
+            const isOngoing = document.getElementById(`ongoing-${matchId}`).checked;
+            fetch(`/admin/toggle_ongoing_match/${matchId}`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ is_ongoing: isOngoing }),
+            })
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('Network response was not ok');
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    if (data.success) {
+                        // Update the UI to reflect the change
+                        const matchElement = document.querySelector(`.match[data-match-id="${matchId}"]`);
+                        if (matchElement) {
+                            if (isOngoing) {
+                                matchElement.classList.add('ongoing');
+                                matchElement.querySelector('.loading').style.display = 'inline-block';
+                            } else {
+                                matchElement.classList.remove('ongoing');
+                                matchElement.querySelector('.loading').style.display = 'none';
+                            }
+                        }
+                    } else {
+                        alert('Error updating match status');
+                        document.getElementById(`ongoing-${matchId}`).checked = !isOngoing;
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    alert('Error updating match status');
+                    document.getElementById(`ongoing-${matchId}`).checked = !isOngoing;
+                });
         }
     </script>
 </body>

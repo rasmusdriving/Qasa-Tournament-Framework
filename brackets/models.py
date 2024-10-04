@@ -76,3 +76,4 @@ class Match(Base):
     team1 = relationship("Team", foreign_keys=[team1_id])
     team2 = relationship("Team", foreign_keys=[team2_id])
     winner = relationship("Team", foreign_keys=[winner_id])
+    is_ongoing = Column(Boolean, default=False, nullable=False)

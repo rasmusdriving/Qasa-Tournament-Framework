@@ -24,7 +24,12 @@ DB_USER = os.getenv("DB_USER", "postgres")
 DB_PASSWORD = os.getenv("DB_PASSWORD", "postgres")
 DB_HOST = os.getenv("DB_HOST", "db")
 DB_NAME = os.getenv("DB_NAME", "tournament_tracker")
-SQLALCHEMY_DATABASE_URL = f"postgresql://{DB_USER}:{DB_PASSWORD}@{DB_HOST}/{DB_NAME}"
+DATABASE_URL = os.getenv("DATABASE_URL")
+
+if DATABASE_URL:
+    SQLALCHEMY_DATABASE_URL = DATABASE_URL.replace('postgres://', 'postgresql://')
+else:
+    SQLALCHEMY_DATABASE_URL = f"postgresql://{DB_USER}:{DB_PASSWORD}@{DB_HOST}/{DB_NAME}"
 
 def get_db_connection():
     retries = 5
@@ -110,7 +115,7 @@ def read_tournaments(skip: int = 0, limit: int = 100, db: Session = Depends(get_
 @app.post("/teams/", response_model=TeamResponse)
 def create_team(team: TeamCreate, db: Session = Depends(get_db)):
     db_team = Team(**team.dict())
-    db.add(db_team)
+    db_add(db_team)
     db.commit()
     db.refresh(db_team)
     return db_team
@@ -385,7 +390,8 @@ async def get_tournament_bracket(tournament_id: int, db: Session = Depends(get_d
                     "team1_score": match.team1_score,
                     "team2_score": match.team2_score,
                     "winner": match.winner.name if match.winner else None,
-                    "position": match.position
+                    "position": match.position,
+                    "is_ongoing": match.is_ongoing  # Add this line
                 }
                 for match in matches
             ]
@@ -461,3 +467,46 @@ async def get_match_details(match_id: int, db: Session = Depends(get_db)):
         "team2_score": match.team2_score,
         "winner": match.winner.name if match.winner else None
     }
+
+@app.post("/admin/edit_team/{team_id}")
+async def edit_team(team_id: int, name: str = Body(...), db: Session = Depends(get_db)):
+    team = db.query(Team).filter(Team.id == team_id).first()
+    if not team:
+        raise HTTPException(status_code=404, detail="Team not found")
+    team.name = name
+    db.commit()
+    return {"success": True}
+
+@app.post("/admin/add_player/{team_id}")
+async def add_player(team_id: int, name: str = Body(...), db: Session = Depends(get_db)):
+    team = db.query(Team).filter(Team.id == team_id).first()
+    if not team:
+        raise HTTPException(status_code=404, detail="Team not found")
+    new_player = Player(name=name, team_id=team_id)
+    db.add(new_player)
+    db.commit()
+    db.refresh(new_player)
+    return {"success": True, "playerId": new_player.id}
+
+@app.post("/admin/remove_player/{team_id}/{player_id}")
+async def remove_player(team_id: int, player_id: int, db: Session = Depends(get_db)):
+    player = db.query(Player).filter(Player.id == player_id, Player.team_id == team_id).first()
+    if not player:
+        raise HTTPException(status_code=404, detail="Player not found")
+    db.delete(player)
+    db.commit()
+    return {"success": True}
+
+@app.post("/admin/toggle_ongoing_match/{match_id}")
+async def toggle_ongoing_match(match_id: int, data: dict = Body(...), db: Session = Depends(get_db)):
+    is_ongoing = data.get('is_ongoing')
+    if is_ongoing is None:
+        raise HTTPException(status_code=422, detail="Missing 'is_ongoing' field in request body")
+    
+    match = db.query(Match).filter(Match.id == match_id).first()
+    if not match:
+        raise HTTPException(status_code=404, detail="Match not found")
+    
+    match.is_ongoing = is_ongoing
+    db.commit()
+    return {"success": True}

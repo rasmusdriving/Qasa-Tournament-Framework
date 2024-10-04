@@ -155,6 +155,44 @@
         .bet-button:hover {
             background-color: #018786;
         }
+
+        .match.ongoing {
+            animation: pulse 2s infinite;
+            box-shadow: 0 0 10px #4CAF50;
+        }
+
+        .ongoing-indicator {
+            background-color: #FF4136;
+            color: white;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-size: 0.8em;
+            font-weight: bold;
+            position: absolute;
+            top: -10px;
+            /* Move it slightly above the match box */
+            left: 50%;
+            transform: translateX(-50%);
+            /* Center it horizontally */
+            z-index: 10;
+            /* Ensure it's above other elements */
+        }
+
+        @keyframes pulse {
+            0% {
+                box-shadow: 0 0 0 0 rgba(76, 175, 80, 0.7);
+            }
+
+            50% {
+                box-shadow: 0 0 0 10px rgba(76, 175, 80, 0.3);
+            }
+
+            100% {
+                box-shadow: 0 0 0 0 rgba(76, 175, 80, 0.7);
+            }
+        }
+
+        /* Remove the .loading class and its animation */
     </style>
 </head>
 
@@ -218,6 +256,9 @@
 
                         round.matches.forEach(function (match, matchIndex) {
                             var matchElement = $('<div class="match"></div>');
+                            if (match.is_ongoing) {
+                                matchElement.addClass('ongoing');
+                            }
                             matchElement.append(`
                                 <div class="team ${match.winner === match.team1 ? 'winner' : ''}">
                                     <span class="team-name">${match.team1 || 'TBD'}</span>
@@ -227,6 +268,7 @@
                                     <span class="team-name">${match.team2 || 'TBD'}</span>
                                     <span class="team-score">${match.team2_score}</span>
                                 </div>
+                                ${match.is_ongoing ? '<div class="ongoing-indicator">LIVE</div>' : ''}
                             `);
 
                             var detailsElement = $('<div class="match-details"></div>');
