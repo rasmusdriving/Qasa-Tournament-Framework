@@ -262,13 +262,20 @@
                         round.matches.forEach(match => {
                             const matchElement = document.createElement('div');
                             matchElement.className = 'match mb-2 p-2 border rounded';
+                            matchElement.id = `match-${match.id}`;
                             matchElement.innerHTML = `
                                 <div class="team mb-1">
-                                    <span>${match.team1 || 'TBD'}</span>
+                                    <select class="team1-select p-1 border rounded" disabled>
+                                        <option value="">Select Team 1</option>
+                                        ${data.teams.map(team => `<option value="${team.id}" ${team.id === match.team1_id ? 'selected' : ''}>${team.name}</option>`).join('')}
+                                    </select>
                                     <input type="number" value="${match.team1_score !== null ? match.team1_score : ''}" min="0" class="w-16 ml-2 p-1 border rounded" id="team1-score-${match.id}" onchange="updateMatch(${match.id})">
                                 </div>
                                 <div class="team mb-1">
-                                    <span>${match.team2 || 'TBD'}</span>
+                                    <select class="team2-select p-1 border rounded" disabled>
+                                        <option value="">Select Team 2</option>
+                                        ${data.teams.map(team => `<option value="${team.id}" ${team.id === match.team2_id ? 'selected' : ''}>${team.name}</option>`).join('')}
+                                    </select>
                                     <input type="number" value="${match.team2_score !== null ? match.team2_score : ''}" min="0" class="w-16 ml-2 p-1 border rounded" id="team2-score-${match.id}" onchange="updateMatch(${match.id})">
                                 </div>
                                 <div class="mt-2">
@@ -285,6 +292,10 @@
                                     </label>
                                 </div>
                                 <div class="save-indicator mt-2" id="save-indicator-${match.id}" style="display: none;">Saved</div>
+                                <div class="mt-2">
+                                    <button class="edit-match-btn bg-blue-500 hover:bg-blue-700 text-white font-bold py-1 px-2 rounded" onclick="editMatch(${match.id})">Edit</button>
+                                    <button class="save-match-btn bg-green-500 hover:bg-green-700 text-white font-bold py-1 px-2 rounded" style="display: none;" onclick="saveMatch(${match.id})">Save</button>
+                                </div>
                             `;
                             roundElement.appendChild(matchElement);
                         });
@@ -650,6 +661,58 @@
                     })
                     .catch(error => console.error('Error:', error));
             }
+        }
+
+        // Add this function to your existing JavaScript
+        function editMatch(matchId) {
+            const matchElement = document.getElementById(`match-${matchId}`);
+            const team1Select = matchElement.querySelector('.team1-select');
+            const team2Select = matchElement.querySelector('.team2-select');
+            const editButton = matchElement.querySelector('.edit-match-btn');
+            const saveButton = matchElement.querySelector('.save-match-btn');
+
+            team1Select.disabled = false;
+            team2Select.disabled = false;
+            editButton.style.display = 'none';
+            saveButton.style.display = 'inline-block';
+        }
+
+        function saveMatch(matchId) {
+            const matchElement = document.getElementById(`match-${matchId}`);
+            const team1Select = matchElement.querySelector('.team1-select');
+            const team2Select = matchElement.querySelector('.team2-select');
+            const editButton = matchElement.querySelector('.edit-match-btn');
+            const saveButton = matchElement.querySelector('.save-match-btn');
+
+            const team1Id = team1Select.value;
+            const team2Id = team2Select.value;
+
+            fetch(`/admin/update_match/${matchId}`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    team1_id: team1Id,
+                    team2_id: team2Id
+                }),
+            })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        team1Select.disabled = true;
+                        team2Select.disabled = true;
+                        editButton.style.display = 'inline-block';
+                        saveButton.style.display = 'none';
+                        alert('Match updated successfully');
+                    } else {
+                        alert('Error updating match');
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    alert('Error updating match');
+                });
         }
     </script>
 </body>

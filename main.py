@@ -377,6 +377,7 @@ async def get_tournament_bracket(tournament_id: int, db: Session = Depends(get_d
         raise HTTPException(status_code=404, detail="Tournament not found")
 
     rounds = db.query(Round).filter(Round.tournament_id == tournament_id).order_by(Round.number).all()
+    teams = db.query(Team).filter(Team.tournament_id == tournament_id).all()
     
     bracket_data = []
     for round in rounds:
@@ -402,7 +403,10 @@ async def get_tournament_bracket(tournament_id: int, db: Session = Depends(get_d
         }
         bracket_data.append(round_data)
 
-    return {"bracket": bracket_data}
+    return {
+        "bracket": bracket_data,
+        "teams": [{"id": team.id, "name": team.name} for team in teams]
+    }
 
 @app.post("/admin/remove_bracket/{tournament_id}")
 async def remove_bracket(tournament_id: int, db: Session = Depends(get_db)):
@@ -431,12 +435,18 @@ async def update_match(
     team1_score: Optional[int] = Body(None),
     team2_score: Optional[int] = Body(None),
     is_ongoing: Optional[bool] = Body(None),
+    team1_id: Optional[int] = Body(None),
+    team2_id: Optional[int] = Body(None),
     db: Session = Depends(get_db)
 ):
     match = db.query(Match).filter(Match.id == match_id).first()
     if not match:
         raise HTTPException(status_code=404, detail="Match not found")
     
+    if team1_id is not None:
+        match.team1_id = team1_id
+    if team2_id is not None:
+        match.team2_id = team2_id
     if team1_score is not None:
         match.team1_score = team1_score
     if team2_score is not None:
@@ -460,6 +470,8 @@ async def update_match(
         "success": True,
         "match": {
             "id": match.id,
+            "team1_id": match.team1_id,
+            "team2_id": match.team2_id,
             "team1_score": match.team1_score,
             "team2_score": match.team2_score,
             "winner": match.winner.name if match.winner else None,
