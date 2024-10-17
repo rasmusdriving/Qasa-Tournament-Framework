@@ -161,8 +161,12 @@
 
                 <div class="mb-4">
                     <button onclick="generateBracket('{{ tournament.id }}')"
-                        class="bg-purple-500 hover:bg-purple-700 text-white font-bold py-2 px-4 rounded">
+                        class="bg-purple-500 hover:bg-purple-700 text-white font-bold py-2 px-4 rounded mr-2">
                         Generate Bracket
+                    </button>
+                    <button onclick="showCreateBracketModal('{{ tournament.id }}')"
+                        class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded">
+                        Create Bracket
                     </button>
                 </div>
 
@@ -172,6 +176,26 @@
                 </div>
             </div>
             {% endfor %}
+        </div>
+    </div>
+
+    <!-- Add this modal at the end of the body -->
+    <div id="createBracketModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 hidden items-center justify-center">
+        <div class="bg-white p-8 rounded-lg">
+            <h2 class="text-2xl font-bold mb-4">Create Bracket</h2>
+            <div id="bracketCreationForm">
+                <!-- This will be populated dynamically -->
+            </div>
+            <div class="mt-4 flex justify-end">
+                <button onclick="closeCreateBracketModal()"
+                    class="bg-gray-500 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded mr-2">
+                    Cancel
+                </button>
+                <button onclick="submitBracket()"
+                    class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded">
+                    Create Bracket
+                </button>
+            </div>
         </div>
     </div>
 
@@ -436,6 +460,108 @@
                     console.error('Error:', error);
                     alert('Error updating match status');
                     document.getElementById(`ongoing-${matchId}`).checked = !isOngoing;
+                });
+        }
+
+        function showCreateBracketModal(tournamentId) {
+            const modal = document.getElementById('createBracketModal');
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+            modal.dataset.tournamentId = tournamentId;  // Store the tournament ID in the modal
+
+            // Fetch teams and populate the form
+            fetch(`/admin/get_teams/${tournamentId}`)
+                .then(response => response.json())
+                .then(teams => {
+                    const form = document.getElementById('bracketCreationForm');
+                    form.innerHTML = `
+                        <div class="mb-4">
+                            <label class="block text-gray-700 text-sm font-bold mb-2" for="roundCount">
+                                Number of Rounds
+                            </label>
+                            <input type="number" id="roundCount" name="roundCount" min="1" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
+                        </div>
+                        <div id="matchups"></div>
+                    `;
+
+                    const roundCountInput = document.getElementById('roundCount');
+                    roundCountInput.addEventListener('change', () => createMatchupInputs(teams, roundCountInput.value));
+                });
+        }
+
+        function createMatchupInputs(teams, roundCount) {
+            const matchupsContainer = document.getElementById('matchups');
+            matchupsContainer.innerHTML = '';
+
+            for (let i = 1; i <= roundCount; i++) {
+                const roundDiv = document.createElement('div');
+                roundDiv.innerHTML = `<h3 class="font-bold mt-4 mb-2">Round ${i}</h3>`;
+
+                const matchCount = Math.pow(2, roundCount - i);
+                for (let j = 1; j <= matchCount; j++) {
+                    roundDiv.innerHTML += `
+                        <div class="mb-2">
+                            <select class="team-select mr-2" data-round="${i}" data-match="${j}" data-team="1">
+                                <option value="">Select Team 1</option>
+                                ${teams.map(team => `<option value="${team.id}">${team.name}</option>`).join('')}
+                            </select>
+                            <select class="team-select" data-round="${i}" data-match="${j}" data-team="2">
+                                <option value="">Select Team 2</option>
+                                ${teams.map(team => `<option value="${team.id}">${team.name}</option>`).join('')}
+                            </select>
+                        </div>
+                    `;
+                }
+
+                matchupsContainer.appendChild(roundDiv);
+            }
+        }
+
+        function closeCreateBracketModal() {
+            const modal = document.getElementById('createBracketModal');
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
+        }
+
+        function submitBracket() {
+            const modal = document.getElementById('createBracketModal');
+            const tournamentId = modal.dataset.tournamentId;
+            const roundCount = document.getElementById('roundCount').value;
+            const matchups = [];
+
+            const teamSelects = document.querySelectorAll('.team-select');
+            teamSelects.forEach(select => {
+                const round = select.dataset.round;
+                const match = select.dataset.match;
+                const team = select.dataset.team;
+                const teamId = select.value;
+
+                if (teamId) {
+                    const existingMatchup = matchups.find(m => m.round === round && m.match === match);
+                    if (existingMatchup) {
+                        existingMatchup[`team${team}`] = teamId;
+                    } else {
+                        matchups.push({ round, match, [`team${team}`]: teamId });
+                    }
+                }
+            });
+
+            fetch(`/admin/create_bracket/${tournamentId}`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ roundCount, matchups }),
+            })
+                .then(response => response.json())
+                .then(data => {
+                    alert(data.message);
+                    closeCreateBracketModal();
+                    updateAdminBracket(tournamentId);
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    alert('Error creating bracket');
                 });
         }
     </script>
