@@ -180,6 +180,14 @@
                     <h4 class="text-lg font-semibold mb-2">Bracket</h4>
                     <div id="admin-bracket-{{ tournament.id }}" class="overflow-x-auto"></div>
                 </div>
+
+                <!-- Add this section after the bracket section for each tournament -->
+                <div>
+                    <h4 class="text-lg font-semibold mb-2">Bets</h4>
+                    <div id="bets-{{ tournament.id }}" class="overflow-x-auto">
+                        <!-- Bets will be loaded here -->
+                    </div>
+                </div>
             </div>
             {% endfor %}
         </div>
@@ -714,6 +722,104 @@
                     alert('Error updating match');
                 });
         }
+
+        function loadBets(tournamentId) {
+            fetch(`/admin/bets/${tournamentId}`)
+                .then(response => response.json())
+                .then(bets => {
+                    const betsContainer = document.getElementById(`bets-${tournamentId}`);
+                    betsContainer.innerHTML = `
+                        <table class="min-w-full bg-white">
+                            <thead>
+                                <tr>
+                                    <th class="py-2 px-4 border-b">Name</th>
+                                    <th class="py-2 px-4 border-b">Amount</th>
+                                    <th class="py-2 px-4 border-b">Team</th>
+                                    <th class="py-2 px-4 border-b">Status</th>
+                                    <th class="py-2 px-4 border-b">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${bets.map(bet => `
+                                    <tr>
+                                        <td class="py-2 px-4 border-b">${bet.name}</td>
+                                        <td class="py-2 px-4 border-b">SEK ${bet.amount}</td>
+                                        <td class="py-2 px-4 border-b">${getTeamName(tournamentId, bet.team_id)}</td>
+                                        <td class="py-2 px-4 border-b">${bet.status}</td>
+                                        <td class="py-2 px-4 border-b">
+                                            ${bet.status === 'pending' ? `
+                                                <button onclick="acceptBet(${bet.id})" class="bg-green-500 hover:bg-green-700 text-white font-bold py-1 px-2 rounded mr-2">Accept</button>
+                                                <button onclick="declineBet(${bet.id})" class="bg-red-500 hover:bg-red-700 text-white font-bold py-1 px-2 rounded mr-2">Decline</button>
+                                            ` : ''}
+                                            <button onclick="deleteBet(${bet.id})" class="bg-gray-500 hover:bg-gray-700 text-white font-bold py-1 px-2 rounded">Delete</button>
+                                        </td>
+                                    </tr>
+                                `).join('')}
+                            </tbody>
+                        </table>
+                    `;
+                });
+        }
+
+        function getTeamName(tournamentId, teamId) {
+            // You'll need to implement this function to get the team name based on the team ID
+            // This might involve storing team data in a JavaScript object or making an API call
+            return `Team ${teamId}`;
+        }
+
+        function acceptBet(betId) {
+            fetch(`/admin/bets/${betId}/accept`, { method: 'POST' })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        alert('Bet accepted');
+                        loadBets(getCurrentTournamentId());
+                    } else {
+                        alert('Error accepting bet');
+                    }
+                });
+        }
+
+        function declineBet(betId) {
+            fetch(`/admin/bets/${betId}/decline`, { method: 'POST' })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        alert('Bet declined');
+                        loadBets(getCurrentTournamentId());
+                    } else {
+                        alert('Error declining bet');
+                    }
+                });
+        }
+
+        function deleteBet(betId) {
+            if (confirm('Are you sure you want to delete this bet?')) {
+                fetch(`/admin/bets/${betId}`, { method: 'DELETE' })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.success) {
+                            alert('Bet deleted');
+                            loadBets(getCurrentTournamentId());
+                        } else {
+                            alert('Error deleting bet');
+                        }
+                    });
+            }
+        }
+
+        function getCurrentTournamentId() {
+            // You'll need to implement this function to get the current tournament ID
+            // This might involve storing the current tournament ID in a data attribute or a JavaScript variable
+            return document.querySelector('.tournament').dataset.tournamentId;
+        }
+
+        // Call this function for each tournament when the page loads
+        document.addEventListener('DOMContentLoaded', function () {
+            {% for tournament in tournaments %}
+            loadBets({{ tournament.id }});
+        {% endfor %}
+        });
     </script>
 </body>
 

@@ -202,6 +202,15 @@
         {% if tournament %}
         <h2 class="text-2xl font-semibold mb-6 text-center text-gray-300">{{ tournament.name }}</h2>
 
+        <div class="mb-8 bg-gray-800 rounded-lg shadow-md p-6">
+            <h3 class="text-xl font-semibold mb-4 text-gray-300">Betting Information</h3>
+            <p class="text-lg mb-4 text-gray-400">Total Pool: SEK {{ betting_pool.total_pool }}</p>
+            <a href="/betting/{{ tournament.id }}"
+                class="bg-purple-500 hover:bg-purple-700 text-white font-bold py-2 px-4 rounded">
+                View Betting Details
+            </a>
+        </div>
+
         <div id="bracket" class="bracket mb-8"></div>
 
         <div class="mt-12">
@@ -224,11 +233,11 @@
                     oddsList.empty();
                     $.each(data, function (team, odd) {
                         oddsList.append(`
-                            <div class="flex justify-between items-center py-2 border-b border-gray-200 last:border-b-0">
-                                <span class="font-semibold">${team}</span>
-                                <span class="text-blue-600 font-bold">${odd}</span>
-                            </div>
-                        `);
+                                <div class="flex justify-between items-center py-2 border-b border-gray-200 last:border-b-0">
+                                    <span class="font-semibold">${team}</span>
+                                    <span class="text-blue-600 font-bold">${odd}</span>
+                                </div>
+                            `);
                     });
                 });
             }
@@ -260,32 +269,32 @@
                                 matchElement.addClass('ongoing');
                             }
                             matchElement.append(`
-                                <div class="team ${match.winner === match.team1 ? 'winner' : ''}">
-                                    <span class="team-name">${match.team1 || 'TBD'}</span>
-                                    <span class="team-score">${match.team1_score}</span>
-                                </div>
-                                <div class="team ${match.winner === match.team2 ? 'winner' : ''}">
-                                    <span class="team-name">${match.team2 || 'TBD'}</span>
-                                    <span class="team-score">${match.team2_score}</span>
-                                </div>
-                                ${match.is_ongoing ? '<div class="ongoing-indicator">LIVE</div>' : ''}
-                            `);
+                                    <div class="team ${match.winner === match.team1 ? 'winner' : ''}">
+                                        <span class="team-name">${match.team1 || 'TBD'}</span>
+                                        <span class="team-score">${match.team1_score}</span>
+                                    </div>
+                                    <div class="team ${match.winner === match.team2 ? 'winner' : ''}">
+                                        <span class="team-name">${match.team2 || 'TBD'}</span>
+                                        <span class="team-score">${match.team2_score}</span>
+                                    </div>
+                                    ${match.is_ongoing ? '<div class="ongoing-indicator">LIVE</div>' : ''}
+                                `);
 
                             var detailsElement = $('<div class="match-details"></div>');
                             detailsElement.append(`
-                                <div class="match-teams">
-                                    <div class="team-info">
-                                        <div class="team-name">${match.team1 || 'TBD'}</div>
-                                        <div class="team-players" id="team1-players-${match.id}"></div>
-                                        <button class="bet-button" onclick="placeBet(${match.id}, ${match.team1_id}, '${match.team1}')">Bet on ${match.team1}</button>
+                                    <div class="match-teams">
+                                        <div class="team-info">
+                                            <div class="team-name">${match.team1 || 'TBD'}</div>
+                                            <div class="team-players" id="team1-players-${match.id}"></div>
+                                            <button class="bet-button" onclick="placeBet(${match.id}, ${match.team1_id}, '${match.team1}')">Bet on ${match.team1}</button>
+                                        </div>
+                                        <div class="team-info">
+                                            <div class="team-name">${match.team2 || 'TBD'}</div>
+                                            <div class="team-players" id="team2-players-${match.id}"></div>
+                                            <button class="bet-button" onclick="placeBet(${match.id}, ${match.team2_id}, '${match.team2}')">Bet on ${match.team2}</button>
+                                        </div>
                                     </div>
-                                    <div class="team-info">
-                                        <div class="team-name">${match.team2 || 'TBD'}</div>
-                                        <div class="team-players" id="team2-players-${match.id}"></div>
-                                        <button class="bet-button" onclick="placeBet(${match.id}, ${match.team2_id}, '${match.team2}')">Bet on ${match.team2}</button>
-                                    </div>
-                                </div>
-                            `);
+                                `);
 
                             matchElement.append(detailsElement);
                             matchElement.attr('data-match-id', match.id);

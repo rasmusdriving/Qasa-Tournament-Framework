@@ -1,5 +1,5 @@
 from fastapi import FastAPI, HTTPException, Depends, Request, Form, Response, Query, Body, UploadFile, File
-from sqlalchemy import create_engine, Column, Integer
+from sqlalchemy import create_engine, Column, Integer, func
 from sqlalchemy.orm import sessionmaker, Session, joinedload
 from pydantic import BaseModel
 from typing import List, Optional
@@ -99,6 +99,29 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 PLAYER_IMAGE_DIR = "static/player_images"
 os.makedirs(PLAYER_IMAGE_DIR, exist_ok=True)
 
+# Add this function to calculate the betting pool and odds
+def calculate_betting_pool_and_odds(tournament_id: int, db: Session):
+    teams = db.query(Team).filter(Team.tournament_id == tournament_id).all()
+    total_bets = db.query(func.sum(Bet.amount)).filter(Bet.tournament_id == tournament_id).scalar() or 0
+    
+    betting_pool = {}
+    for team in teams:
+        team_bets = db.query(func.sum(Bet.amount)).filter(Bet.team_id == team.id).scalar() or 0
+        if team_bets > 0:
+            odds = round(total_bets / team_bets, 2)
+        else:
+            odds = 0
+        betting_pool[team.id] = {
+            "team_name": team.name,
+            "total_bets": team_bets,
+            "odds": odds
+        }
+    
+    return {
+        "total_pool": total_bets,
+        "team_pools": betting_pool
+    }
+
 @app.post("/tournaments/", response_model=TournamentResponse)
 def create_tournament_endpoint(tournament: TournamentCreate, db: Session = Depends(get_db)):
     db_tournament = Tournament(**tournament.dict())
@@ -146,12 +169,13 @@ def get_odds(tournament_id: int, db: Session = Depends(get_db)):
     teams = db.query(Team).filter(Team.tournament_id == tournament_id).all()
     total_bets = sum(bet.amount for team in teams for bet in team.bets)
     odds = {}
-    for team in teams:
-        team_bets = sum(bet.amount for bet in team.bets)
-        if team_bets > 0:
-            odds[team.name] = round(total_bets / team_bets, 2)
-        else:
-            odds[team.name] = 0
+    if total_bets > 0:
+        for team in teams:
+            team_bets = sum(bet.amount for bet in team.bets)
+            if team_bets > 0:
+                odds[team.name] = round(total_bets / team_bets, 2)
+            else:
+                odds[team.name] = 0
     return odds
 
 @app.get("/", response_class=HTMLResponse)
@@ -159,8 +183,15 @@ async def index(request: Request, db: Session = Depends(get_db)):
     active_tournament = db.query(Tournament).filter(Tournament.is_active == True).first()
     if active_tournament:
         teams = db.query(Team).filter(Team.tournament_id == active_tournament.id).all()
-        odds = get_odds(active_tournament.id, db)
-        return templates.TemplateResponse("brackets/index.html", {"request": request, "tournament": active_tournament, "teams": teams, "odds": odds})
+        betting_pool = calculate_betting_pool_and_odds(active_tournament.id, db)
+        odds = get_odds(active_tournament.id, db)  # Add this line
+        return templates.TemplateResponse("brackets/index.html", {
+            "request": request,
+            "tournament": active_tournament,
+            "teams": teams,
+            "betting_pool": betting_pool,
+            "odds": odds  # Add this line
+        })
     return templates.TemplateResponse("brackets/index.html", {"request": request, "message": "No active tournament"})
 
 @app.get("/place_bet/{team_id}", response_class=HTMLResponse)
@@ -170,20 +201,21 @@ async def place_bet_form(request: Request, team_id: int, db: Session = Depends(g
         raise HTTPException(status_code=404, detail="Team not found")
     return templates.TemplateResponse("brackets/place_bet.html", {"request": request, "team": team})
 
-@app.post("/place_bet/{team_id}", response_model=BetResponse)
-async def place_bet(team_id: int, bet: BetCreate, db: Session = Depends(get_db)):
+@app.post("/place_bet/{team_id}")
+async def place_bet(team_id: int, amount: float = Form(...), name: str = Form(...), db: Session = Depends(get_db)):
     try:
         team = db.query(Team).filter(Team.id == team_id).first()
         if not team:
             raise HTTPException(status_code=404, detail="Team not found")
-        db_bet = Bet(**bet.dict(), team_id=team_id, tournament_id=team.tournament_id)
-        db.add(db_bet)
+        
+        new_bet = Bet(name=name, amount=amount, team_id=team_id, tournament_id=team.tournament_id)
+        db.add(new_bet)
         db.commit()
-        db.refresh(db_bet)
-        return JSONResponse(content={"message": "Bet placed successfully", "bet_id": db_bet.id}, status_code=200)
+        
+        return JSONResponse(content={"message": "Bet placed successfully"}, status_code=200)
     except Exception as e:
         db.rollback()
-        return JSONResponse(content={"message": f"Error placing bet: {str(e)}"}, status_code=500)
+        raise HTTPException(status_code=500, detail=f"An error occurred while placing the bet: {str(e)}")
 
 @app.get("/admin", response_class=HTMLResponse)
 async def admin_dashboard(request: Request, show_archived: bool = False, db: Session = Depends(get_db)):
@@ -492,6 +524,97 @@ async def get_match(match_id: int, db: Session = Depends(get_db)):
         "is_ongoing": match.is_ongoing,
         "status": match.status
     }
+
+@app.get("/betting/{tournament_id}", response_class=HTMLResponse)
+async def betting_page(request: Request, tournament_id: int, db: Session = Depends(get_db)):
+    tournament = db.query(Tournament).filter(Tournament.id == tournament_id).first()
+    if not tournament:
+        raise HTTPException(status_code=404, detail="Tournament not found")
+    
+    betting_pool = calculate_betting_pool_and_odds(tournament_id, db)
+    odds = get_odds(tournament_id, db)
+    
+    return templates.TemplateResponse("brackets/betting.html", {
+        "request": request,
+        "tournament": tournament,
+        "betting_pool": betting_pool,
+        "odds": odds
+    })
+
+@app.get("/admin/bets/{tournament_id}")
+async def get_tournament_bets(tournament_id: int, db: Session = Depends(get_db)):
+    bets = db.query(Bet).filter(Bet.tournament_id == tournament_id).all()
+    return [{"id": bet.id, "name": bet.name, "amount": bet.amount, "team_id": bet.team_id, "status": bet.status} for bet in bets]
+
+@app.post("/admin/bets/{bet_id}/accept")
+async def accept_bet(bet_id: int, db: Session = Depends(get_db)):
+    bet = db.query(Bet).filter(Bet.id == bet_id).first()
+    if not bet:
+        raise HTTPException(status_code=404, detail="Bet not found")
+    bet.status = "accepted"
+    db.commit()
+    return {"success": True}
+
+@app.post("/admin/bets/{bet_id}/decline")
+async def decline_bet(bet_id: int, db: Session = Depends(get_db)):
+    bet = db.query(Bet).filter(Bet.id == bet_id).first()
+    if not bet:
+        raise HTTPException(status_code=404, detail="Bet not found")
+    bet.status = "declined"
+    db.commit()
+    return {"success": True}
+
+@app.delete("/admin/bets/{bet_id}")
+async def delete_bet(bet_id: int, db: Session = Depends(get_db)):
+    bet = db.query(Bet).filter(Bet.id == bet_id).first()
+    if not bet:
+        raise HTTPException(status_code=404, detail="Bet not found")
+    db.delete(bet)
+    db.commit()
+    return {"success": True}
+
+@app.post("/admin/delete_tournament/{tournament_id}")
+async def delete_tournament(tournament_id: int, db: Session = Depends(get_db)):
+    try:
+        tournament = db.query(Tournament).filter(Tournament.id == tournament_id).first()
+        if not tournament:
+            raise HTTPException(status_code=404, detail="Tournament not found")
+        
+        logger.info(f"Deleting tournament with ID: {tournament_id}")
+        
+        # Delete all matches associated with the tournament
+        matches_deleted = db.query(Match).filter(Match.round.has(tournament_id=tournament_id)).delete(synchronize_session=False)
+        logger.info(f"Deleted {matches_deleted} matches")
+        
+        # Delete all rounds associated with the tournament
+        rounds_deleted = db.query(Round).filter(Round.tournament_id == tournament_id).delete(synchronize_session=False)
+        logger.info(f"Deleted {rounds_deleted} rounds")
+        
+        # Delete all bets associated with the tournament
+        bets_deleted = db.query(Bet).filter(Bet.tournament_id == tournament_id).delete(synchronize_session=False)
+        logger.info(f"Deleted {bets_deleted} bets")
+        
+        # Delete all players associated with teams in the tournament
+        players_deleted = db.query(Player).filter(Player.team.has(tournament_id=tournament_id)).delete(synchronize_session=False)
+        logger.info(f"Deleted {players_deleted} players")
+        
+        # Delete all teams associated with the tournament
+        teams_deleted = db.query(Team).filter(Team.tournament_id == tournament_id).delete(synchronize_session=False)
+        logger.info(f"Deleted {teams_deleted} teams")
+        
+        # Delete the tournament
+        db.delete(tournament)
+        logger.info(f"Deleted tournament")
+        
+        db.commit()
+        logger.info(f"Successfully deleted tournament with ID: {tournament_id}")
+        
+        return {"success": True, "message": "Tournament deleted successfully"}
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Error deleting tournament: {str(e)}")
+        logger.exception("Full traceback:")
+        raise HTTPException(status_code=500, detail=f"An error occurred while deleting the tournament: {str(e)}")
 
 if __name__ == "__main__":
     import uvicorn

@@ -12,9 +12,10 @@ class Tournament(Base):
     name = Column(String, index=True)
     description = Column(String)
     is_active = Column(Boolean, default=False)
-    is_archived = Column(Boolean, default=False)  # Add this line
+    is_archived = Column(Boolean, default=False)
     teams = relationship("Team", back_populates="tournament")
     rounds = relationship("Round", back_populates="tournament")
+    bets = relationship("Bet", back_populates="tournament")
 
     def calculate_rounds(self):
         team_count = len(self.teams)
@@ -29,7 +30,7 @@ class Team(Base):
     tournament_id = Column(Integer, ForeignKey("tournaments.id"))
     tournament = relationship("Tournament", back_populates="teams")
     players = relationship("Player", back_populates="team")
-    bets = relationship("Bet", back_populates="team")  # Add this line
+    bets = relationship("Bet", back_populates="team")
 
 class Player(Base):
     __tablename__ = "players"
@@ -41,13 +42,13 @@ class Player(Base):
 class Bet(Base):
     __tablename__ = "bets"
     id = Column(Integer, primary_key=True, index=True)
-    name = Column(String)
-    email = Column(String)
+    name = Column(String, index=True)
     amount = Column(Float)
     team_id = Column(Integer, ForeignKey("teams.id"))
     tournament_id = Column(Integer, ForeignKey("tournaments.id"))
-    team = relationship("Team", back_populates="bets")  # Add this line
-    tournament = relationship("Tournament")  # Add this line if you want to access the tournament directly from a bet
+    status = Column(String, default="pending")
+    team = relationship("Team", back_populates="bets")
+    tournament = relationship("Tournament", back_populates="bets")
 
 class Round(Base):
     __tablename__ = "rounds"

@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Betting Details - {{ tournament.name }}</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+</head>
+
+<body class="bg-gray-900">
+    <div class="container mx-auto px-4 py-8">
+        <h1 class="text-4xl font-bold mb-8 text-center text-purple-400">Betting Details</h1>
+        <h2 class="text-2xl font-semibold mb-6 text-center text-gray-300">{{ tournament.name }}</h2>
+
+        <div class="mb-8">
+            <h3 class="text-xl font-semibold mb-2 text-gray-300">Current Betting Pool</h3>
+            <p class="text-lg mb-2 text-gray-400">Total Pool: SEK {{ betting_pool.total_pool }}</p>
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {% for team_id, team_data in betting_pool.team_pools.items() %}
+                <div class="bg-gray-800 shadow-md rounded-lg p-4">
+                    <h4 class="font-semibold text-gray-300">{{ team_data.team_name }}</h4>
+                    <p class="text-gray-400">Total Bets: SEK {{ team_data.total_bets }}</p>
+                    <p class="text-gray-400">Odds: {{ team_data.odds }}x</p>
+                    <p class="text-sm text-gray-500">Potential Win: SEK {{ (100 * team_data.odds)|round(2) }} (per SEK
+                        100 bet)</p>
+                    <button onclick="placeBet({{ team_id }}, '{{ team_data.team_name }}')"
+                        class="mt-2 bg-purple-500 hover:bg-purple-700 text-white font-bold py-2 px-4 rounded">
+                        Place Bet
+                    </button>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+
+        <div class="mt-12">
+            <h3 class="text-2xl font-semibold mb-4 text-center text-gray-300">Current Odds</h3>
+            <div class="bg-gray-800 rounded-lg shadow-md p-6">
+                {% for team, odd in odds.items() %}
+                <div class="flex justify-between items-center py-2 border-b border-gray-700 last:border-b-0">
+                    <span class="font-semibold text-gray-300">{{ team }}</span>
+                    <span class="text-purple-400 font-bold">{{ odd }}</span>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+
+        <div class="mt-8 text-center">
+            <a href="/" class="bg-purple-500 hover:bg-purple-700 text-white font-bold py-2 px-4 rounded">
+                Back to Tournament
+            </a>
+        </div>
+    </div>
+
+    <script>
+        function placeBet(teamId, teamName) {
+            var amount = prompt(`Enter bet amount in SEK for ${teamName}:`);
+            var fullName = prompt("Enter your full name:");
+
+            if (amount && fullName) {
+                $.post(`/place_bet/${teamId}`, { amount: amount, name: fullName })
+                    .done(function (data) {
+                        alert(data.message);
+                        location.reload(); // Reload the page to update the betting pool
+                    })
+                    .fail(function (jqXHR) {
+                        alert("Error placing bet: " + jqXHR.responseJSON.detail);
+                    });
+            }
+        }
+    </script>
+</body>
+
+</html>
