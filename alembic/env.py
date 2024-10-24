@@ -1,11 +1,5 @@
 import os
 import sys
-<<<<<<< Updated upstream
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-
-from brackets.models import Base
-target_metadata = Base.metadata
-=======
 from logging.config import fileConfig
 from dotenv import load_dotenv
 
@@ -28,7 +22,7 @@ from brackets.models import Base
 config = context.config
 
 # Update the database URL from environment variable
-config.set_main_option('sqlalchemy.url', os.getenv("DATABASE_URL").replace('postgres://', 'postgresql://'))
+config.set_main_option('sqlalchemy.url', os.getenv("DATABASE_URL", "").replace('postgres://', 'postgresql://'))
 
 # Interpret the config file for Python logging.
 # This line sets up loggers basically.
@@ -39,11 +33,6 @@ if config.config_file_name is not None:
 # for 'autogenerate' support
 target_metadata = Base.metadata
 
-# other values from the config, defined by the needs of env.py,
-# can be acquired:
-# my_important_option = config.get_main_option("my_important_option")
-# ... etc.
-
 def run_migrations_offline() -> None:
     """Run migrations in 'offline' mode."""
     url = config.get_main_option("sqlalchemy.url")
@@ -52,6 +41,13 @@ def run_migrations_offline() -> None:
         target_metadata=target_metadata,
         literal_binds=True,
         dialect_opts={"paramstyle": "named"},
+        # Add these lines
+        compare_type=True,
+        compare_server_default=True,
+        include_schemas=True,
+        version_table_schema=None,  # This is important
+        # Set this to empty to ignore missing migrations
+        process_revision_directives=None
     )
 
     with context.begin_transaction():
@@ -59,15 +55,26 @@ def run_migrations_offline() -> None:
 
 def run_migrations_online() -> None:
     """Run migrations in 'online' mode."""
+    configuration = config.get_section(config.config_ini_section)
+    configuration["sqlalchemy.url"] = config.get_main_option("sqlalchemy.url")
+    
     connectable = engine_from_config(
-        config.get_section(config.config_ini_section, {}),
+        configuration,
         prefix="sqlalchemy.",
         poolclass=pool.NullPool,
     )
 
     with connectable.connect() as connection:
         context.configure(
-            connection=connection, target_metadata=target_metadata
+            connection=connection,
+            target_metadata=target_metadata,
+            # Add these lines
+            compare_type=True,
+            compare_server_default=True,
+            include_schemas=True,
+            version_table_schema=None,  # This is important
+            # Set this to empty to ignore missing migrations
+            process_revision_directives=None
         )
 
         with context.begin_transaction():
@@ -77,4 +84,3 @@ if context.is_offline_mode():
     run_migrations_offline()
 else:
     run_migrations_online()
->>>>>>> Stashed changes

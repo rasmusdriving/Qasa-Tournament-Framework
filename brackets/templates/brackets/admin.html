@@ -161,8 +161,16 @@
 
                 <div class="mb-4">
                     <button onclick="generateBracket('{{ tournament.id }}')"
-                        class="bg-purple-500 hover:bg-purple-700 text-white font-bold py-2 px-4 rounded">
+                        class="bg-purple-500 hover:bg-purple-700 text-white font-bold py-2 px-4 rounded mr-2">
                         Generate Bracket
+                    </button>
+                    <button onclick="showCreateBracketModal('{{ tournament.id }}')"
+                        class="bg-purple-500 hover:bg-purple-700 text-white font-bold py-2 px-4 rounded mr-2">
+                        Create Bracket
+                    </button>
+                    <button onclick="deleteBracket('{{ tournament.id }}')"
+                        class="bg-red-500 hover:bg-red-700 text-white font-bold py-2 px-4 rounded">
+                        Delete Bracket
                     </button>
                 </div>
 
@@ -172,6 +180,10 @@
                         {% for round in tournament.rounds %}
                         <div class="round mb-4">
                             <div class="flex items-center mb-2">
+                                <button onclick="toggleRound('{{ round.id }}')" class="mr-2 text-gray-700">
+                                    <span id="round-toggle-{{ round.id }}"
+                                        class="transform inline-block transition-transform">▶</span>
+                                </button>
                                 <h5 class="font-semibold mr-2">Round {{ round.round_number }}:</h5>
                                 <input type="text" class="round-name-input border rounded px-2 py-1"
                                     data-round-id="{{ round.id }}" value="{{ round.name }}"
@@ -186,9 +198,16 @@
                                     onclick="showAddMatchModal({{ round.id }}, {{ tournament.id }})">
                                     Add Match
                                 </button>
+                                {% if round.round_number == tournament.rounds|length %}
+                                <button
+                                    class="add-third-place-btn ml-2 bg-purple-500 hover:bg-purple-700 text-white font-bold py-1 px-2 rounded"
+                                    onclick="showAddMatchModal({{ round.id }}, {{ tournament.id }}, true)">
+                                    Add Third Place Match
+                                </button>
+                                {% endif %}
                             </div>
-                            <div id="matches-container-{{ round.id }}" class="space-y-2">
-                                <!-- Matches will be displayed here -->
+                            <div id="matches-container-{{ round.id }}" class="space-y-2 pl-6 hidden">
+                                <!-- Matches will be dynamically loaded here -->
                             </div>
                         </div>
                         {% endfor %}
@@ -199,836 +218,78 @@
         </div>
     </div>
 
-<<<<<<< Updated upstream
-=======
-    <!-- Add this modal at the end of the body -->
+    <!-- Create Bracket Modal -->
     <div id="createBracketModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 hidden items-center justify-center">
-        <div class="bg-white p-8 rounded-lg">
-            <h2 class="text-2xl font-bold mb-4">Create Bracket</h2>
-            <div id="bracketCreationForm">
-                <!-- This will be populated dynamically -->
+        <div class="bg-white p-8 rounded-lg shadow-xl max-w-lg w-full">
+            <h3 class="text-xl font-bold mb-4">Create Tournament Bracket</h3>
+            <div class="mb-4">
+                <label class="block text-sm font-medium text-gray-700 mb-2">Number of Rounds</label>
+                <input type="number" id="roundCount" min="1" value="1" class="w-full px-3 py-2 border rounded-md">
             </div>
-            <div class="mt-4 flex justify-end">
+            <div class="flex justify-end gap-2">
                 <button onclick="closeCreateBracketModal()"
-                    class="bg-gray-500 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded mr-2">
+                    class="bg-gray-500 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded">
                     Cancel
                 </button>
-                <button onclick="submitBracket()"
+                <button onclick="createBracket()"
                     class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded">
-                    Create Bracket
+                    Create
                 </button>
             </div>
         </div>
     </div>
 
+    <!-- Add Match Modal -->
     <div id="addMatchModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 hidden items-center justify-center">
-        <div class="bg-white p-8 rounded-lg w-96">
-            <h2 class="text-2xl font-bold mb-4">Add Match</h2>
-            <div class="space-y-4">
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Match Type</label>
-                    <select id="matchType" class="w-full border rounded px-3 py-2" onchange="toggleMatchFields()">
-                        <option value="normal">Normal Match</option>
-                        <option value="bye">Bye Match</option>
-                    </select>
+        <div class="bg-white p-8 rounded-lg shadow-xl max-w-lg w-full">
+            <h3 class="text-xl font-bold mb-4">Add Match</h3>
+            <div class="mb-4">
+                <label class="block text-sm font-medium text-gray-700 mb-2">Match Type</label>
+                <select id="matchType" onchange="toggleMatchFields()" class="w-full px-3 py-2 border rounded-md">
+                    <option value="normal">Normal Match</option>
+                    <option value="bye">Bye Match</option>
+                </select>
+            </div>
+            <div id="normalMatchFields">
+                <div class="mb-4">
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Team 1</label>
+                    <select id="team1Select" class="w-full px-3 py-2 border rounded-md"></select>
                 </div>
-
-                <div id="normalMatchFields">
-                    <div class="mb-3">
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Team 1</label>
-                        <select id="team1Select" class="w-full border rounded px-3 py-2">
-                            <option value="">Select Team 1</option>
-                        </select>
-                    </div>
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Team 2</label>
-                        <select id="team2Select" class="w-full border rounded px-3 py-2">
-                            <option value="">Select Team 2</option>
-                        </select>
-                    </div>
+                <div class="mb-4">
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Team 2</label>
+                    <select id="team2Select" class="w-full px-3 py-2 border rounded-md"></select>
                 </div>
-
-                <div id="byeMatchFields" class="hidden">
-                    <div class="mb-3">
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Advancing Team</label>
-                        <select id="byeTeamSelect" class="w-full border rounded px-3 py-2">
-                            <option value="">Select Team</option>
-                        </select>
-                    </div>
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Bye Description</label>
-                        <input type="text" id="byeDescription" class="w-full border rounded px-3 py-2"
-                            placeholder="Enter bye description">
-                    </div>
+            </div>
+            <div id="byeMatchFields" class="hidden">
+                <div class="mb-4">
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Team</label>
+                    <select id="byeTeamSelect" class="w-full px-3 py-2 border rounded-md"></select>
                 </div>
-
-                <div class="flex justify-end gap-2 mt-6">
-                    <button onclick="closeAddMatchModal()"
-                        class="bg-gray-500 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded">
-                        Cancel
-                    </button>
-                    <button onclick="submitNewMatch()"
-                        class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded">
-                        Add Match
-                    </button>
+                <div class="mb-4">
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Description</label>
+                    <input type="text" id="byeDescription" class="w-full px-3 py-2 border rounded-md"
+                        placeholder="Optional description">
                 </div>
+            </div>
+            <div class="flex justify-end gap-2">
+                <button onclick="closeAddMatchModal()"
+                    class="bg-gray-500 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded">
+                    Cancel
+                </button>
+                <button onclick="submitNewMatch()"
+                    class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded">
+                    Add Match
+                </button>
             </div>
         </div>
     </div>
 
->>>>>>> Stashed changes
     <script>
+        // All your JavaScript functions go here
         let currentRoundId = null;
         let currentTournamentId = null;
-        let tournamentTeams = {}; // Add this to store teams for each tournament
-
-        function toggleEditForm(tournamentId) {
-            var form = document.getElementById(`edit-form-${tournamentId}`);
-            form.classList.toggle('hidden');
-        }
-
-        function deleteTournament(tournamentId) {
-            if (confirm('Are you sure you want to delete this tournament? This action cannot be undone.')) {
-                fetch(`/admin/delete_tournament/${tournamentId}`, { method: 'POST' })
-                    .then(response => response.json())
-                    .then(data => {
-                        alert(data.message);
-                        location.reload();
-                    })
-                    .catch(error => console.error('Error:', error));
-            }
-        }
-
-        function archiveTournament(tournamentId) {
-            if (confirm('Are you sure you want to archive this tournament?')) {
-                fetch(`/admin/archive_tournament/${tournamentId}`, { method: 'POST' })
-                    .then(response => response.json())
-                    .then(data => {
-                        alert(data.message);
-                        location.reload();
-                    })
-                    .catch(error => console.error('Error:', error));
-            }
-        }
-
-        function generateBracket(tournamentId) {
-            if (confirm('Are you sure you want to generate the bracket for this tournament?')) {
-                fetch(`/admin/generate_bracket/${tournamentId}`, { method: 'POST' })
-                    .then(response => response.json())
-                    .then(data => {
-                        alert(data.message);
-                        location.reload();
-                    })
-                    .catch(error => console.error('Error:', error));
-            }
-        }
-
-        function updateAdminBracket(tournamentId) {
-            fetch(`/tournament/${tournamentId}/bracket`)
-                .then(response => response.json())
-                .then(data => {
-                    const bracketElement = document.getElementById(`admin-bracket-${tournamentId}`);
-                    bracketElement.innerHTML = '';
-
-                    data.bracket.forEach(round => {
-                        const roundElement = document.createElement('div');
-                        roundElement.className = 'round mb-4';
-                        roundElement.innerHTML = `<h5 class="font-semibold mb-2">Round ${round.round_number}</h5>`;
-
-                        round.matches.forEach(match => {
-                            const matchElement = document.createElement('div');
-                            matchElement.className = 'match mb-2 p-2 border rounded';
-                            matchElement.innerHTML = `
-                                <div class="team mb-1">
-                                    <span>${match.team1 || 'TBD'}</span>
-                                    <input type="number" value="${match.team1_score}" min="0" class="w-16 ml-2 p-1 border rounded" id="team1-score-${match.id}" onchange="updateMatch(${match.id})">
-                                </div>
-                                <div class="team mb-1">
-                                    <span>${match.team2 || 'TBD'}</span>
-                                    <input type="number" value="${match.team2_score}" min="0" class="w-16 ml-2 p-1 border rounded" id="team2-score-${match.id}" onchange="updateMatch(${match.id})">
-                                </div>
-                                <div class="mt-2">
-                                    <select class="p-1 border rounded" id="winner-${match.id}" onchange="updateMatch(${match.id})">
-                                        <option value="">Select Winner</option>
-                                        ${match.team1 ? `<option value="${match.team1}" ${match.winner === match.team1 ? 'selected' : ''}>${match.team1}</option>` : ''}
-                                        ${match.team2 ? `<option value="${match.team2}" ${match.winner === match.team2 ? 'selected' : ''}>${match.team2}</option>` : ''}
-                                    </select>
-                                    <span class="save-indicator" id="save-indicator-${match.id}">Saved</span>
-                                </div>
-                                <div class="mt-2">
-                                    <label>
-                                        <input type="checkbox" id="ongoing-${match.id}" onchange="toggleOngoingMatch(${match.id})" ${match.is_ongoing ? 'checked' : ''}>
-                                        Currently Ongoing
-                                    </label>
-                                </div>
-                            `;
-                            roundElement.appendChild(matchElement);
-                        });
-
-                        bracketElement.appendChild(roundElement);
-                    });
-                });
-        }
-
-        function updateMatch(matchId) {
-            const winnerName = document.getElementById(`winner-${matchId}`).value;
-            const team1Score = document.getElementById(`team1-score-${matchId}`).value;
-            const team2Score = document.getElementById(`team2-score-${matchId}`).value;
-            const saveIndicator = document.getElementById(`save-indicator-${matchId}`);
-            const ongoingCheckbox = document.getElementById(`ongoing-${matchId}`);
-
-            saveIndicator.style.display = 'none';
-
-            fetch(`/admin/update_match/${matchId}`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    winner_name: winnerName,
-                    team1_score: parseInt(team1Score),
-                    team2_score: parseInt(team2Score)
-                }),
-            })
-                .then(response => {
-                    if (!response.ok) {
-                        return response.json().then(err => Promise.reject(err));
-                    }
-                    return response.json();
-                })
-                .then(data => {
-                    saveIndicator.style.display = 'inline';
-                    setTimeout(() => {
-                        saveIndicator.style.display = 'none';
-                    }, 2000);
-
-                    // Update ongoing status
-                    if (winnerName) {
-                        ongoingCheckbox.checked = false;
-                        ongoingCheckbox.disabled = true;
-                    } else {
-                        ongoingCheckbox.disabled = false;
-                    }
-                })
-                .catch(error => {
-                    console.error('Error:', error);
-                    alert('Error updating match: ' + (error.detail || 'Unknown error'));
-                });
-        }
-
-        // Call this function for each tournament when the page loads
-        document.addEventListener('DOMContentLoaded', function () {
-            {% for tournament in tournaments %}
-            updateAdminBracket({{ tournament.id }});
-        {% endfor %}
-        });
-
-        function addPlayerInput(tournamentId) {
-            const playerInputs = document.getElementById(`player-inputs-${tournamentId}`);
-            const newInput = document.createElement('input');
-            newInput.type = 'text';
-            newInput.name = 'player_names';
-            newInput.placeholder = 'Player Name';
-            newInput.required = true;
-            newInput.className = 'w-full px-3 py-2 border rounded mt-2';
-            playerInputs.appendChild(newInput);
-        }
-
-        function editTeam(teamId) {
-            const teamNameElement = document.querySelector(`.team-name[data-team-id="${teamId}"]`);
-            const currentName = teamNameElement.textContent;
-            const newName = prompt("Enter new team name:", currentName);
-            if (newName && newName !== currentName) {
-                fetch(`/admin/edit_team/${teamId}`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({ name: newName }),
-                })
-                    .then(response => response.json())
-                    .then(data => {
-                        if (data.success) {
-                            teamNameElement.textContent = newName;
-                        } else {
-                            alert('Error updating team name');
-                        }
-                    })
-                    .catch(error => console.error('Error:', error));
-            }
-        }
-
-        function addPlayer(teamId) {
-            const playerName = prompt("Enter new player name:");
-            if (playerName) {
-                fetch(`/admin/add_player/${teamId}`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({ name: playerName }),
-                })
-                    .then(response => response.json())
-                    .then(data => {
-                        if (data.success) {
-                            const playersList = document.getElementById(`team-players-${teamId}`);
-                            const newPlayerItem = document.createElement('li');
-                            newPlayerItem.innerHTML = `
-                            <span class="player-name">${playerName}</span>
-                            <button class="remove-player-btn text-red-500 hover:text-red-700 ml-2" onclick="removePlayer(${teamId}, ${data.playerId})">Remove</button>
-                        `;
-                            playersList.appendChild(newPlayerItem);
-                        } else {
-                            alert('Error adding player');
-                        }
-                    })
-                    .catch(error => console.error('Error:', error));
-            }
-        }
-
-        function removePlayer(teamId, playerId) {
-            if (confirm('Are you sure you want to remove this player?')) {
-                fetch(`/admin/remove_player/${teamId}/${playerId}`, {
-                    method: 'POST',
-                })
-                    .then(response => response.json())
-                    .then(data => {
-                        if (data.success) {
-                            const playersList = document.getElementById(`team-players-${teamId}`);
-                            const playerItem = playersList.querySelector(`li:has(button[onclick="removePlayer(${teamId}, ${playerId})"])`);
-                            playerItem.remove();
-                        } else {
-                            alert('Error removing player');
-                        }
-                    })
-                    .catch(error => console.error('Error:', error));
-            }
-        }
-
-        function toggleOngoingMatch(matchId) {
-            const isOngoing = document.getElementById(`ongoing-${matchId}`).checked;
-            fetch(`/admin/toggle_ongoing_match/${matchId}`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({ is_ongoing: isOngoing }),
-            })
-                .then(response => {
-                    if (!response.ok) {
-                        throw new Error('Network response was not ok');
-                    }
-                    return response.json();
-                })
-                .then(data => {
-                    if (data.success) {
-                        // Update the UI to reflect the change
-                        const matchElement = document.querySelector(`.match[data-match-id="${matchId}"]`);
-                        if (matchElement) {
-                            if (isOngoing) {
-                                matchElement.classList.add('ongoing');
-                                matchElement.querySelector('.loading').style.display = 'inline-block';
-                            } else {
-                                matchElement.classList.remove('ongoing');
-                                matchElement.querySelector('.loading').style.display = 'none';
-                            }
-                        }
-                    } else {
-                        alert('Error updating match status');
-                        document.getElementById(`ongoing-${matchId}`).checked = !isOngoing;
-                    }
-                })
-                .catch(error => {
-                    console.error('Error:', error);
-                    alert('Error updating match status');
-                    document.getElementById(`ongoing-${matchId}`).checked = !isOngoing;
-                });
-        }
-<<<<<<< Updated upstream
-=======
-
-        function showCreateBracketModal(tournamentId) {
-            const modal = document.getElementById('createBracketModal');
-            modal.classList.remove('hidden');
-            modal.classList.add('flex');
-            modal.dataset.tournamentId = tournamentId;
-
-            // Fetch teams and store them
-            fetch(`/admin/get_teams/${tournamentId}`)
-                .then(response => response.json())
-                .then(teams => {
-                    tournamentTeams[tournamentId] = teams; // Store teams for this tournament
-                    const form = document.getElementById('bracketCreationForm');
-                    form.innerHTML = `
-                        <div class="mb-4">
-                            <label class="block text-gray-700 text-sm font-bold mb-2" for="roundCount">
-                                Number of Rounds
-                            </label>
-                            <input type="number" id="roundCount" name="roundCount" min="1" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
-                        </div>
-                        <div id="roundInputs"></div>
-                        <div id="matchups"></div>
-                    `;
-
-                    document.getElementById('roundCount').addEventListener('change', function () {
-                        generateMatchupInputs(this.value, tournamentId);
-                    });
-                });
-        }
-
-        function generateTeamOptions(tournamentId) {
-            const teams = tournamentTeams[tournamentId];
-            if (!teams) return ''; // Return empty string if no teams found
-
-            return teams.map(team =>
-                `<option value="${team.id}">${team.name}</option>`
-            ).join('');
-        }
-
-        function addMatch(round, tournamentId) {
-            const matchesContainer = document.querySelector(`.matches-container-${round}`);
-            const matchIndex = matchesContainer.children.length + 1;
-
-            const matchDiv = document.createElement('div');
-            matchDiv.className = 'match-input bg-gray-50 p-4 rounded-lg';
-            matchDiv.innerHTML = `
-                <div class="flex items-center gap-4 mb-2">
-                    <div class="flex-1">
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Match ${matchIndex}</label>
-                        <input type="hidden" name="match_position" value="${matchIndex}">
-                        <div class="flex gap-2 items-center">
-                            <select name="team1_${round}_${matchIndex}" class="team-select flex-1 rounded border p-2">
-                                <option value="">Select Team 1</option>
-                                ${generateTeamOptions(tournamentId)}
-                            </select>
-                            <span class="text-gray-500">vs</span>
-                            <select name="team2_${round}_${matchIndex}" class="team-select flex-1 rounded border p-2">
-                                <option value="">Select Team 2</option>
-                                ${generateTeamOptions(tournamentId)}
-                            </select>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="mt-2">
-                    <label class="inline-flex items-center">
-                        <input type="checkbox" class="form-checkbox" onchange="toggleByeMatch(this)">
-                        <span class="ml-2 text-sm text-gray-700">This is a bye match</span>
-                    </label>
-                </div>
-
-                <div class="bye-details hidden mt-2">
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Bye Description</label>
-                    <input type="text" 
-                        class="w-full rounded border p-2" 
-                        placeholder="e.g., Team advances directly to next round"
-                        name="bye_description_${round}_${matchIndex}">
-                    <select name="bye_team_${round}_${matchIndex}" class="mt-2 w-full rounded border p-2">
-                        <option value="">Select advancing team</option>
-                        ${generateTeamOptions(tournamentId)}
-                    </select>
-                </div>
-            `;
-
-            matchesContainer.appendChild(matchDiv);
-        }
-
-        function generateMatchupInputs(roundCount, tournamentId) {
-            const matchupsDiv = document.getElementById('matchups');
-            matchupsDiv.innerHTML = '';
-
-            for (let round = 1; round <= roundCount; round++) {
-                const roundDiv = document.createElement('div');
-                roundDiv.className = 'mb-6';
-                roundDiv.innerHTML = `
-                    <h3 class="text-lg font-semibold mb-3">Round ${round}</h3>
-                    <div class="matches-container-${round} space-y-4"></div>
-                    <button type="button" 
-                        class="mt-2 bg-green-500 hover:bg-green-700 text-white font-bold py-1 px-3 rounded text-sm"
-                        onclick="addMatch(${round}, ${tournamentId})">
-                        + Add Match
-                    </button>
-                `;
-                matchupsDiv.appendChild(roundDiv);
-            }
-        }
-
-        function toggleByeMatch(checkbox) {
-            const byeDetails = checkbox.closest('.match-input').querySelector('.bye-details');
-            const normalMatchInputs = checkbox.closest('.match-input').querySelector('.team-select').closest('div');
-
-            if (checkbox.checked) {
-                byeDetails.classList.remove('hidden');
-                normalMatchInputs.classList.add('hidden');
-            } else {
-                byeDetails.classList.add('hidden');
-                normalMatchInputs.classList.remove('hidden');
-            }
-        }
-
-        function saveBracket() {
-            const tournamentId = document.getElementById('createBracketModal').dataset.tournamentId;
-            const roundCount = document.getElementById('roundCount').value;
-            const matchups = [];
-
-            // Collect all match data
-            for (let round = 1; round <= roundCount; round++) {
-                const matchContainers = document.querySelectorAll(`.matches-container-${round} .match-input`);
-
-                matchContainers.forEach((container, index) => {
-                    const position = index + 1;
-                    const isBye = container.querySelector('input[type="checkbox"]').checked;
-
-                    if (isBye) {
-                        // Handle bye match
-                        const byeTeam = container.querySelector(`[name="bye_team_${round}_${position}"]`).value;
-                        const byeDescription = container.querySelector(`[name="bye_description_${round}_${position}"]`).value;
-
-                        matchups.push({
-                            round: round,
-                            match: position,
-                            is_bye: true,
-                            team1: byeTeam,
-                            team2: null,
-                            bye_description: byeDescription
-                        });
-                    } else {
-                        // Handle normal match
-                        const team1 = container.querySelector(`[name="team1_${round}_${position}"]`).value;
-                        const team2 = container.querySelector(`[name="team2_${round}_${position}"]`).value;
-
-                        matchups.push({
-                            round: round,
-                            match: position,
-                            is_bye: false,
-                            team1: team1 || null,
-                            team2: team2 || null
-                        });
-                    }
-                });
-            }
-
-            // Send data to server
-            fetch(`/admin/create_bracket/${tournamentId}`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    roundCount: roundCount,
-                    matchups: matchups
-                })
-            })
-                .then(response => response.json())
-                .then(data => {
-                    if (data.message) {
-                        alert(data.message);
-                        closeCreateBracketModal();
-                        location.reload();
-                    }
-                })
-                .catch(error => {
-                    console.error('Error:', error);
-                    alert('Error creating bracket');
-                });
-        }
-
-        function closeCreateBracketModal() {
-            const modal = document.getElementById('createBracketModal');
-            modal.classList.add('hidden');
-            modal.classList.remove('flex');
-        }
-
-        function submitBracket() {
-            const modal = document.getElementById('createBracketModal');
-            const tournamentId = modal.dataset.tournamentId;
-            const roundCount = document.getElementById('roundCount').value;
-            const matchups = [];
-
-            const teamSelects = document.querySelectorAll('.team-select');
-            teamSelects.forEach(select => {
-                const round = select.dataset.round;
-                const match = select.dataset.match;
-                const team = select.dataset.team;
-                const teamId = select.value;
-
-                let existingMatchup = matchups.find(m => m.round === round && m.match === match);
-                if (!existingMatchup) {
-                    const byeCheckbox = document.querySelector(`.bye-checkbox[data-round="${round}"][data-match="${match}"]`);
-                    const byeDescription = document.querySelector(`.bye-description[data-round="${round}"][data-match="${match}"]`);
-
-                    existingMatchup = {
-                        round,
-                        match,
-                        team1: null,
-                        team2: null,
-                        is_bye: byeCheckbox.checked,
-                        bye_description: byeCheckbox.checked ? byeDescription.value : null
-                    };
-                    matchups.push(existingMatchup);
-                }
-                if (!existingMatchup.is_bye) {
-                    existingMatchup[`team${team}`] = teamId || null;
-                }
-            });
-
-            // Remove the filter, send all matchups including empty ones
-            fetch(`/admin/create_bracket/${tournamentId}`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({ roundCount, matchups }),
-            })
-                .then(response => response.json())
-                .then(data => {
-                    alert(data.message);
-                    closeCreateBracketModal();
-                    updateAdminBracket(tournamentId);
-                })
-                .catch(error => {
-                    console.error('Error:', error);
-                    alert('Error creating bracket: ' + error);
-                });
-        }
-
-        function deleteTeam(teamId) {
-            if (confirm('Are you sure you want to delete this team? This action cannot be undone.')) {
-                fetch(`/admin/delete_team/${teamId}`, {
-                    method: 'POST',
-                })
-                    .then(response => response.json())
-                    .then(data => {
-                        if (data.success) {
-                            // Remove the team element from the DOM
-                            const teamElement = document.querySelector(`.team-name[data-team-id="${teamId}"]`).closest('.bg-gray-100');
-                            teamElement.remove();
-                        } else {
-                            alert('Error deleting team');
-                        }
-                    })
-                    .catch(error => console.error('Error:', error));
-            }
-        }
-
-        function removeBracket(tournamentId) {
-            if (confirm('Are you sure you want to remove the bracket for this tournament? This action cannot be undone.')) {
-                fetch(`/admin/remove_bracket/${tournamentId}`, {
-                    method: 'POST',
-                })
-                    .then(response => response.json())
-                    .then(data => {
-                        if (data.success) {
-                            alert('Bracket removed successfully');
-                            // Clear the bracket display
-                            const bracketElement = document.getElementById(`admin-bracket-${tournamentId}`);
-                            bracketElement.innerHTML = '';
-                        } else {
-                            alert('Error removing bracket');
-                        }
-                    })
-                    .catch(error => console.error('Error:', error));
-            }
-        }
-
-        // Add this function to your existing JavaScript
-        function editMatch(matchId) {
-            const matchElement = document.getElementById(`match-${matchId}`);
-            const team1Select = matchElement.querySelector('.team1-select');
-            const team2Select = matchElement.querySelector('.team2-select');
-            const editButton = matchElement.querySelector('.edit-match-btn');
-            const saveButton = matchElement.querySelector('.save-match-btn');
-
-            team1Select.disabled = false;
-            team2Select.disabled = false;
-            editButton.style.display = 'none';
-            saveButton.style.display = 'inline-block';
-        }
-
-        function saveMatch(matchId) {
-            const matchElement = document.getElementById(`match-${matchId}`);
-            const team1Select = matchElement.querySelector('.team1-select');
-            const team2Select = matchElement.querySelector('.team2-select');
-            const editButton = matchElement.querySelector('.edit-match-btn');
-            const saveButton = matchElement.querySelector('.save-match-btn');
-
-            const team1Id = team1Select.value;
-            const team2Id = team2Select.value;
-
-            fetch(`/admin/update_match/${matchId}`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    team1_id: team1Id,
-                    team2_id: team2Id
-                }),
-            })
-                .then(response => response.json())
-                .then(data => {
-                    if (data.success) {
-                        team1Select.disabled = true;
-                        team2Select.disabled = true;
-                        editButton.style.display = 'inline-block';
-                        saveButton.style.display = 'none';
-                        alert('Match updated successfully');
-                    } else {
-                        alert('Error updating match');
-                    }
-                })
-                .catch(error => {
-                    console.error('Error:', error);
-                    alert('Error updating match');
-                });
-        }
-
-        function loadBets(tournamentId) {
-            fetch(`/admin/bets/${tournamentId}`)
-                .then(response => response.json())
-                .then(bets => {
-                    const betsContainer = document.getElementById(`bets-${tournamentId}`);
-                    betsContainer.innerHTML = `
-                        <table class="min-w-full bg-white">
-                            <thead>
-                                <tr>
-                                    <th class="py-2 px-4 border-b">Name</th>
-                                    <th class="py-2 px-4 border-b">Amount</th>
-                                    <th class="py-2 px-4 border-b">Team</th>
-                                    <th class="py-2 px-4 border-b">Status</th>
-                                    <th class="py-2 px-4 border-b">Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                ${bets.map(bet => `
-                                    <tr>
-                                        <td class="py-2 px-4 border-b">${bet.name}</td>
-                                        <td class="py-2 px-4 border-b">SEK ${bet.amount}</td>
-                                        <td class="py-2 px-4 border-b">${getTeamName(tournamentId, bet.team_id)}</td>
-                                        <td class="py-2 px-4 border-b">${bet.status}</td>
-                                        <td class="py-2 px-4 border-b">
-                                            ${bet.status === 'pending' ? `
-                                                <button onclick="acceptBet(${bet.id})" class="bg-green-500 hover:bg-green-700 text-white font-bold py-1 px-2 rounded mr-2">Accept</button>
-                                                <button onclick="declineBet(${bet.id})" class="bg-red-500 hover:bg-red-700 text-white font-bold py-1 px-2 rounded mr-2">Decline</button>
-                                            ` : ''}
-                                            <button onclick="deleteBet(${bet.id})" class="bg-gray-500 hover:bg-gray-700 text-white font-bold py-1 px-2 rounded">Delete</button>
-                                        </td>
-                                    </tr>
-                                `).join('')}
-                            </tbody>
-                        </table>
-                    `;
-                });
-        }
-
-        function getTeamName(tournamentId, teamId) {
-            // You'll need to implement this function to get the team name based on the team ID
-            // This might involve storing team data in a JavaScript object or making an API call
-            return `Team ${teamId}`;
-        }
-
-        function acceptBet(betId) {
-            fetch(`/admin/bets/${betId}/accept`, { method: 'POST' })
-                .then(response => response.json())
-                .then(data => {
-                    if (data.success) {
-                        alert('Bet accepted');
-                        loadBets(getCurrentTournamentId());
-                    } else {
-                        alert('Error accepting bet');
-                    }
-                });
-        }
-
-        function declineBet(betId) {
-            fetch(`/admin/bets/${betId}/decline`, { method: 'POST' })
-                .then(response => response.json())
-                .then(data => {
-                    if (data.success) {
-                        alert('Bet declined');
-                        loadBets(getCurrentTournamentId());
-                    } else {
-                        alert('Error declining bet');
-                    }
-                });
-        }
-
-        function deleteBet(betId) {
-            if (confirm('Are you sure you want to delete this bet?')) {
-                fetch(`/admin/bets/${betId}`, { method: 'DELETE' })
-                    .then(response => response.json())
-                    .then(data => {
-                        if (data.success) {
-                            alert('Bet deleted');
-                            loadBets(getCurrentTournamentId());
-                        } else {
-                            alert('Error deleting bet');
-                        }
-                    });
-            }
-        }
-
-        function getCurrentTournamentId() {
-            // You'll need to implement this function to get the current tournament ID
-            // This might involve storing the current tournament ID in a data attribute or a JavaScript variable
-            return document.querySelector('.tournament').dataset.tournamentId;
-        }
-
-        // Call this function for each tournament when the page loads
-        document.addEventListener('DOMContentLoaded', function () {
-            {% for tournament in tournaments %}
-            loadBets({{ tournament.id }});
-        {% endfor %}
-        });
-
-        // Add this function to your existing JavaScript
-        function saveRoundName(roundId) {
-            const input = document.querySelector(`input[data-round-id="${roundId}"]`);
-            const newName = input.value.trim();
-
-            fetch(`/admin/update_round_name/${roundId}`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({ name: newName }),
-            })
-                .then(response => response.json())
-                .then(data => {
-                    if (data.success) {
-                        alert('Round name updated successfully');
-                    } else {
-                        alert('Error updating round name');
-                    }
-                })
-                .catch(error => {
-                    console.error('Error:', error);
-                    alert('Error updating round name');
-                });
-        }
-
-        function showAddMatchModal(roundId, tournamentId) {
-            currentRoundId = roundId;
-            currentTournamentId = tournamentId;
-
-            // Fetch teams for the tournament
-            fetch(`/admin/get_teams/${tournamentId}`)
-                .then(response => response.json())
-                .then(teams => {
-                    // Populate team select options
-                    const teamOptions = teams.map(team =>
-                        `<option value="${team.id}">${team.name}</option>`
-                    ).join('');
-
-                    document.getElementById('team1Select').innerHTML = '<option value="">Select Team 1</option>' + teamOptions;
-                    document.getElementById('team2Select').innerHTML = '<option value="">Select Team 2</option>' + teamOptions;
-                    document.getElementById('byeTeamSelect').innerHTML = '<option value="">Select Team</option>' + teamOptions;
-                });
-
-            const modal = document.getElementById('addMatchModal');
-            modal.classList.remove('hidden');
-            modal.classList.add('flex');
-        }
+        let currentTournamentIdForBracket = null;
+        let currentIsThirdPlace = false;
 
         function closeAddMatchModal() {
             const modal = document.getElementById('addMatchModal');
@@ -1038,6 +299,7 @@
             currentTournamentId = null;
         }
 
+        // Add all other JavaScript functions here
         function toggleMatchFields() {
             const matchType = document.getElementById('matchType').value;
             const normalFields = document.getElementById('normalMatchFields');
@@ -1052,23 +314,99 @@
             }
         }
 
+        function showAddMatchModal(roundId, tournamentId, isThirdPlace = false) {
+            currentRoundId = roundId;
+            currentTournamentId = tournamentId;
+            currentIsThirdPlace = isThirdPlace;
+
+            // Fetch teams for the tournament
+            fetch(`/admin/teams/${tournamentId}`)
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('Failed to fetch teams');
+                    }
+                    return response.json();
+                })
+                .then(teams => {
+                    if (!Array.isArray(teams)) {
+                        throw new Error('Invalid teams data received');
+                    }
+
+                    const teamOptions = teams.map(team =>
+                        `<option value="${team.id}">${team.name}</option>`
+                    ).join('');
+
+                    document.getElementById('team1Select').innerHTML = '<option value="">Select Team 1</option>' + teamOptions;
+                    document.getElementById('team2Select').innerHTML = '<option value="">Select Team 2</option>' + teamOptions;
+                    document.getElementById('byeTeamSelect').innerHTML = '<option value="">Select Team</option>' + teamOptions;
+
+                    // Update modal title based on match type
+                    const modalTitle = document.querySelector('#addMatchModal h3');
+                    modalTitle.textContent = isThirdPlace ? 'Add Third Place Match' : 'Add Match';
+
+                    // Hide bye option for third place matches
+                    const matchTypeSelect = document.getElementById('matchType');
+                    if (isThirdPlace) {
+                        matchTypeSelect.value = 'normal';
+                        matchTypeSelect.disabled = true;
+                        toggleMatchFields();
+                    } else {
+                        matchTypeSelect.disabled = false;
+                    }
+                })
+                .catch(error => {
+                    console.error('Error fetching teams:', error);
+                    alert('Error loading teams. Please try again.');
+                });
+
+            const modal = document.getElementById('addMatchModal');
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+        }
+
         function submitNewMatch() {
+            if (!currentRoundId) {
+                console.error('No round ID selected');
+                alert('Error: No round selected');
+                return;
+            }
+
             const matchType = document.getElementById('matchType').value;
-            let matchData;
+            let matchData = {
+                round_id: currentRoundId,
+                is_third_place: currentIsThirdPlace || false
+            };
 
             if (matchType === 'normal') {
+                const team1Id = document.getElementById('team1Select').value;
+                const team2Id = document.getElementById('team2Select').value;
+
+                // Only validate team selection if it's not a third place match
+                if (!currentIsThirdPlace && (!team1Id || !team2Id)) {
+                    alert('Please select both teams');
+                    return;
+                }
+
                 matchData = {
-                    round_id: currentRoundId,
-                    team1_id: document.getElementById('team1Select').value,
-                    team2_id: document.getElementById('team2Select').value,
+                    ...matchData,
+                    team1_id: team1Id ? parseInt(team1Id) : null,
+                    team2_id: team2Id ? parseInt(team2Id) : null,
                     is_bye: false
                 };
             } else {
+                const byeTeamId = document.getElementById('byeTeamSelect').value;
+                const byeDescription = document.getElementById('byeDescription').value;
+
+                if (!byeTeamId) {
+                    alert('Please select a team');
+                    return;
+                }
+
                 matchData = {
-                    round_id: currentRoundId,
-                    team1_id: document.getElementById('byeTeamSelect').value,
+                    ...matchData,
+                    team1_id: parseInt(byeTeamId),
                     is_bye: true,
-                    bye_description: document.getElementById('byeDescription').value
+                    bye_description: byeDescription || 'Bye Match'
                 };
             }
 
@@ -1079,22 +417,342 @@
                 },
                 body: JSON.stringify(matchData)
             })
-                .then(response => response.json())
+                .then(response => {
+                    if (!response.ok) {
+                        return response.json().then(err => Promise.reject(err));
+                    }
+                    return response.json();
+                })
                 .then(data => {
                     if (data.success) {
                         closeAddMatchModal();
-                        updateAdminBracket(currentTournamentId);
+                        // Reload the matches in the round
+                        loadRoundMatches(currentRoundId);
+                        // Update the bracket display
+                        if (currentTournamentId) {
+                            updateAdminBracket(currentTournamentId);
+                        }
                         alert('Match added successfully');
                     } else {
-                        alert('Error adding match: ' + data.message);
+                        alert('Error adding match: ' + (data.detail || 'Unknown error'));
                     }
                 })
                 .catch(error => {
                     console.error('Error:', error);
-                    alert('Error adding match');
+                    alert('Error adding match: ' + (error.detail || 'Unknown error'));
                 });
         }
->>>>>>> Stashed changes
+
+        // Add these new functions to your existing JavaScript
+        function toggleRound(roundId) {
+            const container = document.getElementById(`matches-container-${roundId}`);
+            const toggle = document.getElementById(`round-toggle-${roundId}`);
+
+            if (container.classList.contains('hidden')) {
+                container.classList.remove('hidden');
+                toggle.style.transform = 'rotate(90deg)';
+                loadRoundMatches(roundId);
+            } else {
+                container.classList.add('hidden');
+                toggle.style.transform = 'rotate(0deg)';
+            }
+        }
+
+        function loadRoundMatches(roundId) {
+            if (!roundId) {
+                console.error('No round ID provided to loadRoundMatches');
+                return;
+            }
+
+            const container = document.getElementById(`matches-container-${roundId}`);
+            if (!container) {
+                console.error(`Container for round ${roundId} not found`);
+                return;
+            }
+
+            fetch(`/admin/round/${roundId}/matches`)
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! status: ${response.status}`);
+                    }
+                    return response.json();
+                })
+                .then(matches => {
+                    if (!Array.isArray(matches)) {
+                        console.error('Received invalid matches data:', matches);
+                        throw new Error('Invalid matches data received');
+                    }
+
+                    container.innerHTML = matches.map(match => `
+                        <div class="match bg-white p-4 rounded shadow-md mb-2 ${match.is_third_place ? 'border-2 border-purple-500' : ''}" 
+                            data-match-id="${match.id}">
+                            ${match.is_third_place ? `
+                                <div class="bg-purple-100 text-purple-700 px-2 py-1 rounded mb-2 font-semibold inline-block">
+                                    Third Place Match
+                                </div>
+                            ` : ''}
+                            ${match.is_bye ? `
+                                <div class="bye-match">
+                                    <p class="font-semibold">Bye Match</p>
+                                    <div class="flex items-center justify-between mb-2">
+                                        <select class="p-1 border rounded w-64" 
+                                            onchange="updateMatchTeam(${match.id}, 'team1', this.value)">
+                                            <option value="">TBD</option>
+                                            ${match.available_teams?.map(team =>
+                        `<option value="${team.id}" ${team.id === match.team1_id ? 'selected' : ''}>
+                                                    ${team.name}
+                                                </option>`
+                    ).join('')}
+                                        </select>
+                                    </div>
+                                    <div class="mb-2">
+                                        <input type="text" 
+                                            value="${match.bye_description || ''}" 
+                                            class="w-full p-1 border rounded"
+                                            placeholder="Bye Description"
+                                            onchange="updateByeDescription(${match.id}, this.value)">
+                                    </div>
+                                    <button onclick="deleteMatch(${match.id})" 
+                                        class="mt-2 bg-red-500 hover:bg-red-700 text-white font-bold py-1 px-2 rounded">
+                                        Delete Match
+                                    </button>
+                                </div>
+                            ` : `
+                                <div class="flex flex-col space-y-2">
+                                    <div class="flex items-center justify-between">
+                                        <select class="p-1 border rounded w-64" 
+                                            onchange="updateMatchTeam(${match.id}, 'team1', this.value)">
+                                            <option value="">TBD</option>
+                                            ${match.available_teams?.map(team =>
+                        `<option value="${team.id}" ${team.id === match.team1_id ? 'selected' : ''}>
+                                                    ${team.name}
+                                                </option>`
+                    ).join('')}
+                                        </select>
+                                        <input type="number" value="${match.team1_score || ''}" 
+                                            class="w-16 ml-2 p-1 border rounded"
+                                            onchange="updateMatchScore(${match.id}, 'team1', this.value)"
+                                            ${!match.team1_id ? 'disabled' : ''}>
+                                    </div>
+                                    <div class="flex items-center justify-between">
+                                        <select class="p-1 border rounded w-64" 
+                                            onchange="updateMatchTeam(${match.id}, 'team2', this.value)">
+                                            <option value="">TBD</option>
+                                            ${match.available_teams?.map(team =>
+                        `<option value="${team.id}" ${team.id === match.team2_id ? 'selected' : ''}>
+                                                    ${team.name}
+                                                </option>`
+                    ).join('')}
+                                        </select>
+                                        <input type="number" value="${match.team2_score || ''}" 
+                                            class="w-16 ml-2 p-1 border rounded"
+                                            onchange="updateMatchScore(${match.id}, 'team2', this.value)"
+                                            ${!match.team2_id ? 'disabled' : ''}>
+                                    </div>
+                                    <div class="flex items-center justify-between mt-2">
+                                        <select class="p-1 border rounded" 
+                                            onchange="updateMatchWinner(${match.id}, this.value)"
+                                            ${(!match.team1_id || !match.team2_id) ? 'disabled' : ''}>
+                                            <option value="">Select Winner</option>
+                                            ${match.team1_id ? `<option value="${match.team1_id}" ${match.winner_id === match.team1_id ? 'selected' : ''}>${match.team1_name}</option>` : ''}
+                                            ${match.team2_id ? `<option value="${match.team2_id}" ${match.winner_id === match.team2_id ? 'selected' : ''}>${match.team2_name}</option>` : ''}
+                                        </select>
+                                        <button onclick="deleteMatch(${match.id})" 
+                                            class="bg-red-500 hover:bg-red-700 text-white font-bold py-1 px-2 rounded">
+                                            Delete Match
+                                        </button>
+                                    </div>
+                                </div>
+                            `}
+                        </div>
+                    `).join('');
+                })
+                .catch(error => {
+                    console.error('Error loading matches:', error);
+                    container.innerHTML = '<p class="text-red-500">Error loading matches</p>';
+                });
+        }
+
+        function updateMatchScore(matchId, team, score) {
+            const data = {};
+            data[`${team}_score`] = parseInt(score);
+
+            fetch(`/admin/match/${matchId}/update`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(data)
+            })
+                .then(response => response.json())
+                .then(data => {
+                    if (!data.success) {
+                        throw new Error(data.detail || 'Failed to update score');
+                    }
+                })
+                .catch(error => {
+                    console.error('Error updating score:', error);
+                    alert('Error updating score. Please try again.');
+                });
+        }
+
+        function updateMatchWinner(matchId, winnerId) {
+            fetch(`/admin/match/${matchId}/update`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    winner_id: winnerId ? parseInt(winnerId) : null
+                })
+            })
+                .then(response => response.json())
+                .then(data => {
+                    if (!data.success) {
+                        throw new Error(data.detail || 'Failed to update winner');
+                    }
+                })
+                .catch(error => {
+                    console.error('Error updating winner:', error);
+                    alert('Error updating winner. Please try again.');
+                });
+        }
+
+        function deleteMatch(matchId) {
+            if (!confirm('Are you sure you want to delete this match?')) {
+                return;
+            }
+
+            fetch(`/admin/match/${matchId}/delete`, {
+                method: 'POST'
+            })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        // Reload the matches in the round
+                        const roundId = data.round_id;
+                        loadRoundMatches(roundId);
+                    } else {
+                        throw new Error(data.detail || 'Failed to delete match');
+                    }
+                })
+                .catch(error => {
+                    console.error('Error deleting match:', error);
+                    alert('Error deleting match. Please try again.');
+                });
+        }
+
+        function saveRoundName(roundId) {
+            const input = document.querySelector(`input[data-round-id="${roundId}"]`);
+            const name = input.value;
+
+            fetch(`/admin/update_round_name/${roundId}`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ name: name })
+            })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        // Show a brief success message
+                        const button = document.querySelector(`button[onclick="saveRoundName(${roundId})"]`);
+                        const successIndicator = document.createElement('span');
+                        successIndicator.textContent = '✓';
+                        successIndicator.className = 'text-green-500 ml-2';
+                        button.parentNode.appendChild(successIndicator);
+
+                        // Remove the success indicator after 2 seconds
+                        setTimeout(() => {
+                            successIndicator.remove();
+                        }, 2000);
+                    } else {
+                        throw new Error(data.detail || 'Failed to save round name');
+                    }
+                })
+                .catch(error => {
+                    console.error('Error saving round name:', error);
+                    alert('Error saving round name. Please try again.');
+                });
+        }
+
+        // Add these new functions
+        function updateMatchTeam(matchId, teamField, teamId) {
+            const data = {};
+            data[`${teamField}_id`] = teamId ? parseInt(teamId) : null;
+
+            fetch(`/admin/match/${matchId}/update`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(data)
+            })
+                .then(response => response.json())
+                .then(data => {
+                    if (!data.success) {
+                        throw new Error(data.detail || 'Failed to update team');
+                    }
+                    // Reload the match display to show updated teams and winner options
+                    const match = document.querySelector(`[data-match-id="${matchId}"]`);
+                    if (match) {
+                        const roundId = match.closest('.round').dataset.roundId;
+                        loadRoundMatches(roundId);
+                    }
+                })
+                .catch(error => {
+                    console.error('Error updating team:', error);
+                    alert('Error updating team. Please try again.');
+                });
+        }
+
+        function updateByeDescription(matchId, description) {
+            fetch(`/admin/match/${matchId}/update`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    bye_description: description
+                })
+            })
+                .then(response => response.json())
+                .then(data => {
+                    if (!data.success) {
+                        throw new Error(data.detail || 'Failed to update bye description');
+                    }
+                })
+                .catch(error => {
+                    console.error('Error updating bye description:', error);
+                    alert('Error updating bye description. Please try again.');
+                });
+        }
+
+        function updateMatchTitle(matchId, title) {
+            fetch(`/admin/match/${matchId}/update`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    title: title
+                })
+            })
+                .then(response => response.json())
+                .then(data => {
+                    if (!data.success) {
+                        throw new Error(data.detail || 'Failed to update match title');
+                    }
+                })
+                .catch(error => {
+                    console.error('Error updating match title:', error);
+                    alert('Error updating match title. Please try again.');
+                });
+        }
+
+        // Add other functions...
+
     </script>
 </body>
 

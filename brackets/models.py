@@ -73,10 +73,11 @@ class Match(Base):
     winner_id = Column(Integer, ForeignKey("teams.id"), nullable=True)
     status = Column(Enum(MatchStatus), default=MatchStatus.PENDING)
     position = Column(Integer)
-    is_bye = Column(Boolean, default=False)  # Add this line
-    bye_description = Column(String, nullable=True)  # Add this line
+    is_bye = Column(Boolean, default=False)
+    bye_description = Column(String, nullable=True)
     round = relationship("Round", back_populates="matches")
     team1 = relationship("Team", foreign_keys=[team1_id])
     team2 = relationship("Team", foreign_keys=[team2_id])
     winner = relationship("Team", foreign_keys=[winner_id])
     is_ongoing = Column(Boolean, default=False, nullable=False)
+    is_third_place = Column(Boolean, default=False)  # Add this line instead of title

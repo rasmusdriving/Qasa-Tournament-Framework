@@ -158,16 +158,10 @@ def get_odds(tournament_id: int, db: Session = Depends(get_db)):
 async def index(request: Request, db: Session = Depends(get_db)):
     active_tournament = db.query(Tournament).filter(Tournament.is_active == True).first()
     if active_tournament:
-<<<<<<< Updated upstream
         teams = db.query(Team).filter(Team.tournament_id == active_tournament.id).all()
         odds = get_odds(active_tournament.id, db)
         return templates.TemplateResponse("brackets/index.html", {"request": request, "tournament": active_tournament, "teams": teams, "odds": odds})
     return templates.TemplateResponse("brackets/index.html", {"request": request, "message": "No active tournament"})
-=======
-        return templates.TemplateResponse("brackets/index.html", {"request": request, "tournament": active_tournament})
-    else:
-        return templates.TemplateResponse("brackets/no_active_tournament.html", {"request": request})
->>>>>>> Stashed changes
 
 @app.get("/place_bet/{team_id}", response_class=HTMLResponse)
 async def place_bet_form(request: Request, team_id: int, db: Session = Depends(get_db)):
@@ -375,37 +369,51 @@ async def update_match(match_id: int, data: dict = Body(...), db: Session = Depe
 
 @app.get("/tournament/{tournament_id}/bracket")
 async def get_tournament_bracket(tournament_id: int, db: Session = Depends(get_db)):
-    tournament = db.query(Tournament).filter(Tournament.id == tournament_id).first()
-    if not tournament:
-        raise HTTPException(status_code=404, detail="Tournament not found")
+    try:
+        # Get tournament with rounds and matches
+        tournament = db.query(Tournament).filter(Tournament.id == tournament_id).first()
+        if not tournament:
+            raise HTTPException(status_code=404, detail="Tournament not found")
 
-    rounds = db.query(Round).filter(Round.tournament_id == tournament_id).order_by(Round.number).all()
-    
-    bracket_data = []
-    for round in rounds:
-        matches = db.query(Match).filter(Match.round_id == round.id).order_by(Match.position).all()
-        round_data = {
-            "round_number": round.number,
-            "matches": [
-                {
+        # Get all rounds for the tournament with their matches
+        rounds = db.query(Round).filter(Round.tournament_id == tournament_id)\
+            .order_by(Round.round_number).all()
+
+        bracket_data = []
+        for round in rounds:
+            matches = db.query(Match).filter(Match.round_id == round.id).all()
+            match_data = []
+            
+            for match in matches:
+                team1 = db.query(Team).filter(Team.id == match.team1_id).first() if match.team1_id else None
+                team2 = db.query(Team).filter(Team.id == match.team2_id).first() if match.team2_id else None
+                
+                match_data.append({
                     "id": match.id,
-                    "team1": match.team1.name if match.team1 else "TBD",
-                    "team2": match.team2.name if match.team2 else "TBD",
-                    "team1_id": match.team1.id if match.team1 else None,
-                    "team2_id": match.team2.id if match.team2 else None,
+                    "team1_id": match.team1_id,
+                    "team2_id": match.team2_id,
+                    "team1": team1.name if team1 else None,
+                    "team2": team2.name if team2 else None,
                     "team1_score": match.team1_score,
                     "team2_score": match.team2_score,
-                    "winner": match.winner.name if match.winner else None,
-                    "winner_id": match.winner.id if match.winner else None,
-                    "position": match.position,
+                    "winner_id": match.winner_id,
+                    "is_bye": match.is_bye,
+                    "bye_description": match.bye_description,
                     "is_ongoing": match.is_ongoing
-                }
-                for match in matches
-            ]
-        }
-        bracket_data.append(round_data)
+                })
 
-    return {"bracket": bracket_data}
+            bracket_data.append({
+                "id": round.id,
+                "round_number": round.round_number,
+                "name": round.name,
+                "matches": match_data
+            })
+
+        return {"success": True, "bracket": bracket_data}
+        
+    except Exception as e:
+        logger.error(f"Error getting tournament bracket: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/admin/delete_tournament/{tournament_id}")
 async def delete_tournament(tournament_id: int, db: Session = Depends(get_db)):
@@ -518,50 +526,64 @@ async def toggle_ongoing_match(match_id: int, data: dict = Body(...), db: Sessio
     db.commit()
     return {"success": True}
 
-<<<<<<< Updated upstream
-=======
 @app.get("/admin/get_teams/{tournament_id}")
 async def get_teams(tournament_id: int, db: Session = Depends(get_db)):
     teams = db.query(Team).filter(Team.tournament_id == tournament_id).all()
     return [{"id": team.id, "name": team.name} for team in teams]
 
 @app.post("/admin/create_bracket/{tournament_id}")
-async def create_bracket(tournament_id: int, data: dict = Body(...), db: Session = Depends(get_db)):
+async def create_bracket(
+    tournament_id: int,
+    data: dict = Body(...),
+    db: Session = Depends(get_db)
+):
     try:
         tournament = db.query(Tournament).filter(Tournament.id == tournament_id).first()
         if not tournament:
             raise HTTPException(status_code=404, detail="Tournament not found")
+
+        round_count = data.get('round_count', 1)
         
-        # Delete existing rounds and matches
-        db.query(Match).filter(Match.round.has(tournament_id=tournament_id)).delete(synchronize_session=False)
-        db.query(Round).filter(Round.tournament_id == tournament_id).delete(synchronize_session=False)
-        
-        round_count = int(data['roundCount'])
-        matchups = data['matchups']
-        
-        for i in range(1, round_count + 1):
-            new_round = Round(tournament_id=tournament_id, round_number=i)
+        # Create rounds
+        for i in range(round_count):
+            new_round = Round(
+                tournament_id=tournament_id,
+                round_number=i + 1,
+                name=f"Round {i + 1}"
+            )
             db.add(new_round)
-            db.flush()
-            
-            round_matchups = [m for m in matchups if int(m['round']) == i]
-            for match in round_matchups:
-                new_match = Match(
-                    round_id=new_round.id,
-                    team1_id=match.get('team1'),
-                    team2_id=match.get('team2'),
-                    position=int(match['match']),
-                    is_bye=match.get('is_bye', False),
-                    bye_description=match.get('bye_description')
-                )
-                db.add(new_match)
         
         db.commit()
-        return {"message": "Bracket created successfully"}
+        return {"success": True, "message": "Bracket created successfully"}
+        
     except Exception as e:
         db.rollback()
         logger.error(f"Error creating bracket: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"An error occurred while creating the bracket: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/admin/delete_bracket/{tournament_id}")
+async def delete_bracket(tournament_id: int, db: Session = Depends(get_db)):
+    try:
+        # Delete all matches associated with the tournament's rounds
+        matches_deleted = db.query(Match).filter(
+            Match.round_id.in_(
+                db.query(Round.id).filter(Round.tournament_id == tournament_id)
+            )
+        ).delete(synchronize_session=False)
+        
+        # Delete all rounds associated with the tournament
+        rounds_deleted = db.query(Round).filter(Round.tournament_id == tournament_id).delete(synchronize_session=False)
+        
+        db.commit()
+        return {
+            "success": True,
+            "message": f"Bracket deleted successfully. Deleted {matches_deleted} matches and {rounds_deleted} rounds."
+        }
+        
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Error deleting bracket: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/admin/delete_team/{team_id}")
 async def delete_team(team_id: int, db: Session = Depends(get_db)):
@@ -797,8 +819,140 @@ async def delete_tournament(tournament_id: int, db: Session = Depends(get_db)):
         logger.exception("Full traceback:")
         raise HTTPException(status_code=500, detail=f"An error occurred while deleting the tournament: {str(e)}")
 
->>>>>>> Stashed changes
+@app.post("/admin/update_round_name/{round_id}")
+async def update_round_name(round_id: int, name: str = Body(..., embed=True), db: Session = Depends(get_db)):
+    try:
+        round = db.query(Round).filter(Round.id == round_id).first()
+        if not round:
+            raise HTTPException(status_code=404, detail="Round not found")
+        
+        round.name = name
+        db.commit()
+        return {"success": True}
+    except Exception as e:
+        logger.error(f"Error updating round name: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+# Add this new endpoint
+@app.post("/admin/add_match")
+async def add_match(
+    match_data: dict,
+    db: Session = Depends(get_db)
+):
+    try:
+        # Get the round
+        round_id = match_data.get('round_id')
+        round = db.query(Round).filter(Round.id == round_id).first()
+        if not round:
+            raise HTTPException(status_code=404, detail="Round not found")
+
+        # Create new match
+        new_match = Match(
+            round_id=round_id,
+            team1_id=match_data.get('team1_id') if match_data.get('team1_id') != "" else None,  # Allow None for TBD
+            team2_id=match_data.get('team2_id') if match_data.get('team2_id') != "" else None,  # Allow None for TBD
+            is_bye=match_data.get('is_bye', False),
+            bye_description=match_data.get('bye_description') if match_data.get('is_bye') else None,
+            is_third_place=match_data.get('is_third_place', False)
+        )
+        
+        db.add(new_match)
+        db.commit()
+        db.refresh(new_match)
+        
+        return {"success": True, "match_id": new_match.id}
+        
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/admin/teams/{tournament_id}")
+async def get_tournament_teams(tournament_id: int, db: Session = Depends(get_db)):
+    try:
+        teams = db.query(Team).filter(Team.tournament_id == tournament_id).all()
+        return [{"id": team.id, "name": team.name} for team in teams]
+    except Exception as e:
+        logger.error(f"Error getting tournament teams: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/admin/round/{round_id}/matches")
+async def get_round_matches(round_id: int, db: Session = Depends(get_db)):
+    try:
+        matches = db.query(Match).filter(Match.round_id == round_id).all()
+        round = db.query(Round).filter(Round.id == round_id).first()
+        
+        # Get all teams from the tournament
+        tournament_teams = db.query(Team).filter(Team.tournament_id == round.tournament_id).all()
+        available_teams = [{"id": team.id, "name": team.name} for team in tournament_teams]
+        
+        # Get total number of rounds to identify if this is the final round
+        total_rounds = db.query(Round).filter(Round.tournament_id == round.tournament_id).count()
+        is_final_round = round.round_number == total_rounds
+        
+        match_data = []
+        for match in matches:
+            team1 = db.query(Team).filter(Team.id == match.team1_id).first() if match.team1_id else None
+            team2 = db.query(Team).filter(Team.id == match.team2_id).first() if match.team2_id else None
+            
+            match_data.append({
+                "id": match.id,
+                "team1_id": match.team1_id,
+                "team2_id": match.team2_id,
+                "team1_name": team1.name if team1 else None,
+                "team2_name": team2.name if team2 else None,
+                "team1_score": match.team1_score,
+                "team2_score": match.team2_score,
+                "winner_id": match.winner_id,
+                "is_bye": match.is_bye,
+                "bye_description": match.bye_description,
+                "is_third_place": match.is_third_place,  # Replace title with is_third_place
+                "available_teams": available_teams,
+                "is_final_round": is_final_round
+            })
+            
+        return match_data
+    except Exception as e:
+        logger.error(f"Error getting round matches: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/admin/match/{match_id}/update")
+async def update_match(match_id: int, data: dict = Body(...), db: Session = Depends(get_db)):
+    try:
+        match = db.query(Match).filter(Match.id == match_id).first()
+        if not match:
+            raise HTTPException(status_code=404, detail="Match not found")
+        
+        # Update match fields
+        for key, value in data.items():
+            if hasattr(match, key):
+                setattr(match, key, value)
+        
+        db.commit()
+        return {"success": True}
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Error updating match: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/admin/match/{match_id}/delete")
+async def delete_match(match_id: int, db: Session = Depends(get_db)):
+    try:
+        match = db.query(Match).filter(Match.id == match_id).first()
+        if not match:
+            raise HTTPException(status_code=404, detail="Match not found")
+        
+        round_id = match.round_id
+        db.delete(match)
+        db.commit()
+        
+        return {"success": True, "round_id": round_id}
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Error deleting match: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
 if __name__ == "__main__":
     import uvicorn
     port = int(os.getenv("PORT", 8000))
     uvicorn.run("main:app", host="0.0.0.0", port=port, reload=True)
+

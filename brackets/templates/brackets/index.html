@@ -43,103 +43,22 @@
             border-radius: 1rem;
             padding: 1.5rem;
             position: relative;
-<<<<<<< Updated upstream
-            transition: transform 0.3s ease, box-shadow 0.3s ease;
-        }
-
-        .match:hover {
-            transform: scale(1.05);
-            box-shadow: 0 8px 16px rgba(0, 0, 0, 0.3);
-=======
             box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2);
             transition: transform 0.3s ease;
         }
 
         .match-card:hover {
             transform: translateY(-4px);
->>>>>>> Stashed changes
         }
 
         .team-container {
             display: flex;
             align-items: center;
-<<<<<<< Updated upstream
-            color: #e0e0e0;
-            margin-bottom: 5px;
-            padding: 5px;
-            border-radius: 4px;
-        }
-
-        .team.winner {
-            background-color: #1e4d3e;
-        }
-
-        .team-name {
-            font-weight: bold;
-        }
-
-        .team-score {
-            font-weight: bold;
-            color: #03dac6;
-        }
-
-        .connector {
-            stroke: #03dac6;
-            stroke-width: 2px;
-            fill: none;
-        }
-
-        .match-details {
-            display: none;
-            position: fixed;
-            background-color: #1e1e1e;
-            border: 1px solid #3d3d3d;
-            padding: 20px;
-            z-index: 1000;
-            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.4);
-            max-width: 690px;
-            max-height: 80vh;
-            overflow-y: auto;
-            border-radius: 8px;
-        }
-
-        .match-details-popup {
-            display: none;
-            position: fixed;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            background-color: #1e1e1e;
-            border: 1px solid #3d3d3d;
-            padding: 20px;
-            z-index: 1000;
-            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.4);
-            max-width: 80%;
-            max-height: 80vh;
-            overflow-y: auto;
-            border-radius: 8px;
-        }
-
-        .player-image {
-            width: 150px;
-            height: 208px;
-            object-fit: cover;
-            margin-right: 10px;
-            margin-bottom: 10px;
-            border-radius: 4px;
-        }
-
-        .match-teams {
-            display: flex;
-            justify-content: space-between;
-            margin-bottom: 15px;
-=======
             padding: 0.75rem;
             margin: 0.5rem 0;
             border-radius: 0.5rem;
             background: rgba(255, 255, 255, 0.05);
             position: relative;
->>>>>>> Stashed changes
         }
 
         .team-info {
@@ -223,20 +142,6 @@
             }
         }
 
-<<<<<<< Updated upstream
-        .overlay {
-            display: none;
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background-color: rgba(0, 0, 0, 0.5);
-            z-index: 999;
-        }
-
-        /* Remove the .loading class and its animation */
-=======
         @media (max-width: 768px) {
             .bracket-container {
                 padding: 1rem;
@@ -247,7 +152,6 @@
                 min-width: 280px;
             }
         }
->>>>>>> Stashed changes
     </style>
 </head>
 
@@ -256,22 +160,6 @@
         <h1 class="text-4xl font-bold mb-8 text-center text-purple-400">Tournament Tracker</h1>
 
         {% if tournament %}
-<<<<<<< Updated upstream
-        <h2 class="text-2xl font-semibold mb-6 text-center text-gray-300">{{ tournament.name }}</h2>
-
-        <div id="bracket" class="bracket mb-8"></div>
-
-        <div class="mt-12">
-            <h3 class="text-2xl font-semibold mb-4 text-center text-gray-300">Current Odds</h3>
-            <div id="odds-list" class="bg-gray-800 rounded-lg shadow-md p-6">
-                {% for team, odd in odds.items() %}
-                <div class="flex justify-between items-center py-2 border-b border-gray-700 last:border-b-0">
-                    <span class="font-semibold text-gray-300">{{ team }}</span>
-                    <span class="text-purple-400 font-bold">{{ odd }}</span>
-                </div>
-                {% endfor %}
-            </div>
-=======
         <div class="mb-8">
             <h2 class="text-2xl font-semibold text-center text-gray-300">{{ tournament.name }}</h2>
             <p class="text-center text-gray-400 mt-2">{{ tournament.description }}</p>
@@ -279,32 +167,9 @@
 
         <div id="bracket" class="bracket-container">
             <!-- Bracket will be populated by JavaScript -->
->>>>>>> Stashed changes
         </div>
 
         <script>
-<<<<<<< Updated upstream
-            let currentOpenMatchId = null;
-            let popupElement = null;
-            let overlayElement = null;
-
-            function updateOdds() {
-                $.getJSON("/odds/{{ tournament.id }}", function (data) {
-                    var oddsList = $("#odds-list");
-                    oddsList.empty();
-                    $.each(data, function (team, odd) {
-                        oddsList.append(`
-                            <div class="flex justify-between items-center py-2 border-b border-gray-200 last:border-b-0">
-                                <span class="font-semibold">${team}</span>
-                                <span class="text-blue-600 font-bold">${odd}</span>
-                            </div>
-                        `);
-                    });
-                });
-            }
-
-=======
->>>>>>> Stashed changes
             function updateBracket() {
                 $.getJSON("/tournament/{{ tournament.id }}/bracket", function (data) {
                     const bracket = $("#bracket");
@@ -327,54 +192,6 @@
 
                         round.matches.sort((a, b) => a.position - b.position);
 
-<<<<<<< Updated upstream
-                        round.matches.forEach(function (match, matchIndex) {
-                            var matchElement = $('<div class="match"></div>');
-                            if (match.is_ongoing) {
-                                matchElement.addClass('ongoing');
-                            }
-                            matchElement.append(`
-                                <div class="team ${match.winner === match.team1 ? 'winner' : ''}">
-                                    <span class="team-name">${match.team1 || 'TBD'}</span>
-                                    <span class="team-score">${match.team1_score}</span>
-                                </div>
-                                <div class="team ${match.winner === match.team2 ? 'winner' : ''}">
-                                    <span class="team-name">${match.team2 || 'TBD'}</span>
-                                    <span class="team-score">${match.team2_score}</span>
-                                </div>
-                                ${match.is_ongoing ? '<div class="ongoing-indicator">LIVE</div>' : ''}
-                            `);
-
-                            var detailsElement = $('<div class="match-details"></div>');
-                            detailsElement.append(`
-                                <div class="match-teams">
-                                    <div class="team-info">
-                                        <div class="team-name">${match.team1 || 'TBD'}</div>
-                                        <div class="team-players" id="team1-players-${match.id}"></div>
-                                        <button class="bet-button" onclick="placeBet(${match.id}, ${match.team1_id}, '${match.team1}')">Bet on ${match.team1}</button>
-                                    </div>
-                                    <div class="team-info">
-                                        <div class="team-name">${match.team2 || 'TBD'}</div>
-                                        <div class="team-players" id="team2-players-${match.id}"></div>
-                                        <button class="bet-button" onclick="placeBet(${match.id}, ${match.team2_id}, '${match.team2}')">Bet on ${match.team2}</button>
-                                    </div>
-                                </div>
-                            `);
-
-                            matchElement.append(detailsElement);
-                            matchElement.attr('data-match-id', match.id);
-                            roundElement.append(matchElement);
-
-                            matchElement.on('click', function (e) {
-                                e.stopPropagation();
-                                toggleMatchDetails(match.id);
-                            });
-
-                            // Only fetch player details if this match is currently open
-                            if (currentOpenMatchId === match.id) {
-                                updatePlayerDetails(match);
-                            }
-=======
                         round.matches.forEach(match => {
                             const matchCard = $(`
                                 <div class="match-card ${match.is_bye ? 'bye-match' : ''}">
@@ -406,157 +223,13 @@
                             `);
 
                             roundColumn.append(matchCard);
->>>>>>> Stashed changes
                         });
 
                         bracket.append(roundColumn);
                     });
-<<<<<<< Updated upstream
-
-                    // Draw connectors after all rounds and matches are added
-                    setTimeout(function () {
-                        $('.round').each(function (roundIndex, roundElement) {
-                            if (roundIndex < data.bracket.length - 1) {
-                                var nextRound = $(roundElement).next('.round');
-
-                                $(roundElement).find('.match').each(function (matchIndex, matchElement) {
-                                    var nextMatchIndex = Math.floor(matchIndex / 2);
-                                    var nextMatch = nextRound.find(`.match:eq(${nextMatchIndex})`);
-
-                                    if (nextMatch.length) {
-                                        var startRect = matchElement.getBoundingClientRect();
-                                        var endRect = nextMatch[0].getBoundingClientRect();
-                                        var bracketRect = bracket[0].getBoundingClientRect();
-
-                                        var startX = startRect.right - bracketRect.left;
-                                        var startY = startRect.top + (startRect.height / 2) - bracketRect.top;
-                                        var endX = endRect.left - bracketRect.left;
-                                        var endY = endRect.top + (endRect.height / 2) - bracketRect.top;
-
-                                        var midX = startX + (endX - startX) / 2;
-
-                                        var path = document.createElementNS("http://www.w3.org/2000/svg", "path");
-                                        path.setAttribute("d", `M${startX},${startY} C${midX},${startY} ${midX},${endY} ${endX},${endY}`);
-                                        path.setAttribute("class", "connector");
-                                        svg.appendChild(path);
-                                    }
-                                });
-                            }
-                        });
-                    }, 0);
-
-                    // Update the popup content if it's open
-                    if (currentOpenMatchId) {
-                        updatePopupContent(currentOpenMatchId);
-                    }
                 });
             }
 
-            function toggleMatchDetails(matchId) {
-                if (currentOpenMatchId === matchId) {
-                    hideMatchDetails();
-                } else {
-                    showMatchDetails(matchId);
-                }
-            }
-
-            function showMatchDetails(matchId) {
-                currentOpenMatchId = matchId;
-
-                if (!popupElement) {
-                    popupElement = $('<div class="match-details-popup"></div>');
-                    $('body').append(popupElement);
-                }
-
-                if (!overlayElement) {
-                    overlayElement = $('<div class="overlay"></div>');
-                    $('body').append(overlayElement);
-                }
-
-                updatePopupContent(matchId);
-
-                overlayElement.fadeIn(300);
-                popupElement.fadeIn(300);
-
-                // Add click event to close popup when clicking outside
-                overlayElement.on('click', hideMatchDetails);
-            }
-
-            function updatePopupContent(matchId) {
-                var matchElement = $(`.match[data-match-id="${matchId}"]`);
-                var details = matchElement.find('.match-details').clone();
-
-                // Update the content of the popup
-                popupElement.html(details.html());
-
-                // Fetch and update player details
-                $.getJSON(`/match/${matchId}`, function (matchDetails) {
-                    updatePlayerDetails(matchDetails);
-                }).fail(function () {
-                    console.error('Failed to fetch match details for match ID:', matchId);
-                });
-            }
-
-            function hideMatchDetails() {
-                currentOpenMatchId = null;
-                if (popupElement) {
-                    popupElement.fadeOut(300);
-                }
-                if (overlayElement) {
-                    overlayElement.fadeOut(300);
-                    // Remove click event when hiding
-                    overlayElement.off('click');
-                }
-            }
-
-            function updatePlayerDetails(matchDetails) {
-                var team1Players = popupElement.find(`#team1-players-${matchDetails.id}`);
-                var team2Players = popupElement.find(`#team2-players-${matchDetails.id}`);
-
-                updateTeamPlayers(team1Players, matchDetails.team1.players);
-                updateTeamPlayers(team2Players, matchDetails.team2.players);
-            }
-
-            function updateTeamPlayers(teamElement, players) {
-                if (players.length > 0) {
-                    players.forEach(function (player) {
-                        var playerImage = teamElement.find(`img[alt="${player.name}"]`);
-                        if (playerImage.length === 0) {
-                            teamElement.append(`<img src="/static/player_images/${player.name}.png" alt="${player.name}" class="player-image" title="${player.name}">`);
-                        }
-                    });
-                    // Remove any extra player images
-                    teamElement.find('img').each(function () {
-                        if (!players.some(player => player.name === $(this).attr('alt'))) {
-                            $(this).remove();
-                        }
-                    });
-                } else {
-                    teamElement.html('<p>No players</p>');
-                }
-            }
-
-            function placeBet(matchId, teamId, teamName) {
-                var amount = prompt(`Enter bet amount in SEK for ${teamName}:`);
-                var fullName = prompt("Enter your full name:");
-
-                if (amount && fullName) {
-                    $.post(`/place_bet/${matchId}/${teamId}`, { amount: amount, full_name: fullName })
-                        .done(function (data) {
-                            alert(data.message);
-                            updateOdds();
-                        })
-                        .fail(function (jqXHR) {
-                            alert("Error placing bet: " + jqXHR.responseJSON.detail);
-                        });
-                }
-            }
-
-=======
-                });
-            }
-
->>>>>>> Stashed changes
             $(document).ready(function () {
                 updateBracket();
                 setInterval(updateBracket, 5000); // Update every 5 seconds
