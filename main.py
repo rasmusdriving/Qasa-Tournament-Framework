@@ -1,5 +1,5 @@
 from fastapi import FastAPI, HTTPException, Depends, Request, Form, Response, Query, Body, UploadFile, File
-from sqlalchemy import create_engine, Column, Integer
+from sqlalchemy import create_engine, Column, Integer, func  # Add func here
 from sqlalchemy.orm import sessionmaker, Session, joinedload
 from pydantic import BaseModel
 from typing import List, Optional
@@ -154,14 +154,21 @@ def get_odds(tournament_id: int, db: Session = Depends(get_db)):
             odds[team.name] = 0
     return odds
 
-@app.get("/")
-async def index(request: Request, db: Session = Depends(get_db)):
-    active_tournament = db.query(Tournament).filter(Tournament.is_active == True).first()
-    if active_tournament:
-        teams = db.query(Team).filter(Team.tournament_id == active_tournament.id).all()
-        odds = get_odds(active_tournament.id, db)
-        return templates.TemplateResponse("brackets/index.html", {"request": request, "tournament": active_tournament, "teams": teams, "odds": odds})
-    return templates.TemplateResponse("brackets/index.html", {"request": request, "message": "No active tournament"})
+@app.get("/", response_class=HTMLResponse)
+async def read_root(request: Request, db: Session = Depends(get_db)):
+    # Get the active tournament
+    tournament = db.query(Tournament).filter(Tournament.is_active == True).first()
+    
+    logger.info(f"Active tournament query result: {tournament}")
+    if tournament:
+        logger.info(f"Found active tournament: ID={tournament.id}, Name={tournament.name}")
+    else:
+        logger.info("No active tournament found")
+    
+    return templates.TemplateResponse("brackets/index.html", {
+        "request": request,
+        "tournament": tournament
+    })
 
 @app.get("/place_bet/{team_id}", response_class=HTMLResponse)
 async def place_bet_form(request: Request, team_id: int, db: Session = Depends(get_db)):
@@ -219,16 +226,41 @@ async def edit_tournament(
     tournament_id: int,
     name: str = Form(...),
     description: str = Form(...),
-    is_active: bool = Form(False),
+    is_active: Optional[str] = Form(None),
     db: Session = Depends(get_db)
 ):
-    tournament = db.query(Tournament).filter(Tournament.id == tournament_id).first()
-    if tournament:
+    try:
+        tournament = db.query(Tournament).filter(Tournament.id == tournament_id).first()
+        if not tournament:
+            raise HTTPException(status_code=404, detail="Tournament not found")
+
+        # Convert checkbox value to boolean - Form data comes as "on" when checked, None when unchecked
+        is_active_bool = is_active == "on"
+        
+        # If this tournament is being set to active, first deactivate all other tournaments
+        if is_active_bool:
+            db.query(Tournament).filter(Tournament.id != tournament_id).update({"is_active": False})
+            db.flush()  # Ensure the update is processed before continuing
+
+        # Update tournament fields
         tournament.name = name
         tournament.description = description
-        tournament.is_active = is_active
+        tournament.is_active = is_active_bool  # Set the is_active value
+
         db.commit()
-    return RedirectResponse(url="/admin", status_code=303)
+        
+        # Log the update for debugging
+        logger.info(f"Tournament {tournament_id} updated: name={name}, description={description}, is_active={is_active_bool}")
+        
+        # Verify the update
+        db.refresh(tournament)
+        logger.info(f"After update verification - Tournament {tournament_id} is_active: {tournament.is_active}")
+
+        return RedirectResponse(url="/admin", status_code=303)
+    except Exception as e:
+        logger.error(f"Error editing tournament: {str(e)}")
+        db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/admin/add_team/{tournament_id}")
 async def add_team(
@@ -277,58 +309,31 @@ async def edit_tournament_form(tournament_id: int, request: Request, db: Session
     return templates.TemplateResponse("brackets/edit_tournament.html", {"request": request, "tournament": tournament})
 
 @app.post("/admin/generate_bracket/{tournament_id}")
-async def generate_bracket(tournament_id: int, db: Session = Depends(get_db)):
-    tournament = db.query(Tournament).filter(Tournament.id == tournament_id).first()
-    if not tournament:
-        raise HTTPException(status_code=404, detail="Tournament not found")
+async def generate_bracket(tournament_id: int, data: dict = Body(...), db: Session = Depends(get_db)):
+    try:
+        tournament = db.query(Tournament).filter(Tournament.id == tournament_id).first()
+        if not tournament:
+            raise HTTPException(status_code=404, detail="Tournament not found")
 
-    teams = tournament.teams
-    if len(teams) < 2:
-        raise HTTPException(status_code=400, detail="Not enough teams to generate a bracket")
+        # Delete existing bracket if any
+        await delete_tournament_bracket(tournament_id, db)
 
-    # Delete existing rounds and matches
-    db.query(Match).filter(Match.round.has(tournament_id=tournament_id)).delete(synchronize_session=False)
-    db.query(Round).filter(Round.tournament_id == tournament_id).delete(synchronize_session=False)
+        # Create new rounds based on the specified count
+        round_count = data.get('round_count', 1)
+        for i in range(round_count):
+            new_round = Round(
+                tournament_id=tournament_id,
+                round_number=i + 1,
+                name=f"Round {i + 1}"
+            )
+            db.add(new_round)
 
-    # Calculate the number of rounds needed
-    num_rounds = tournament.calculate_rounds()
-
-    # Create rounds
-    rounds = []
-    for round_num in range(1, num_rounds + 1):
-        new_round = Round(tournament_id=tournament_id, number=round_num)
-        db.add(new_round)
-        rounds.append(new_round)
-
-    db.flush()
-
-    # Shuffle teams
-    teams = list(teams)
-    random.shuffle(teams)
-
-    # Create matches for the first round
-    first_round = rounds[0]
-    num_first_round_matches = math.ceil(len(teams) / 2)
-    for i in range(num_first_round_matches):
-        team1 = teams[i * 2] if i * 2 < len(teams) else None
-        team2 = teams[i * 2 + 1] if i * 2 + 1 < len(teams) else None
-        match = Match(
-            round_id=first_round.id,
-            team1_id=team1.id if team1 else None,
-            team2_id=team2.id if team2 else None,
-            position=i
-        )
-        db.add(match)
-
-    # Create empty matches for subsequent rounds
-    for round_index, round in enumerate(rounds[1:], 1):
-        num_matches = num_first_round_matches // (2 ** round_index)
-        for i in range(num_matches):
-            match = Match(round_id=round.id, position=i)
-            db.add(match)
-
-    db.commit()
-    return {"message": "Bracket generated successfully"}
+        db.commit()
+        return {"success": True, "message": "Bracket created successfully"}
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Error generating bracket: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/admin/update_match/{match_id}")
 async def update_match(match_id: int, data: dict = Body(...), db: Session = Depends(get_db)):
@@ -370,46 +375,45 @@ async def update_match(match_id: int, data: dict = Body(...), db: Session = Depe
 @app.get("/tournament/{tournament_id}/bracket")
 async def get_tournament_bracket(tournament_id: int, db: Session = Depends(get_db)):
     try:
-        # Get tournament with rounds and matches
         tournament = db.query(Tournament).filter(Tournament.id == tournament_id).first()
         if not tournament:
             raise HTTPException(status_code=404, detail="Tournament not found")
 
-        # Get all rounds for the tournament with their matches
-        rounds = db.query(Round).filter(Round.tournament_id == tournament_id)\
-            .order_by(Round.round_number).all()
-
+        rounds = db.query(Round).filter(Round.tournament_id == tournament_id).order_by(Round.round_number).all()
         bracket_data = []
+
         for round in rounds:
-            matches = db.query(Match).filter(Match.round_id == round.id).all()
+            matches = db.query(Match).filter(Match.round_id == round.id).order_by(Match.order).all()
             match_data = []
             
             for match in matches:
                 team1 = db.query(Team).filter(Team.id == match.team1_id).first() if match.team1_id else None
                 team2 = db.query(Team).filter(Team.id == match.team2_id).first() if match.team2_id else None
                 
-                match_data.append({
+                match_info = {
                     "id": match.id,
-                    "team1_id": match.team1_id,
-                    "team2_id": match.team2_id,
-                    "team1": team1.name if team1 else None,
-                    "team2": team2.name if team2 else None,
+                    "team1": {"id": team1.id, "name": team1.name, "players": [{"name": p.name} for p in team1.players]} if team1 else None,
+                    "team2": {"id": team2.id, "name": team2.name, "players": [{"name": p.name} for p in team2.players]} if team2 else None,
                     "team1_score": match.team1_score,
                     "team2_score": match.team2_score,
                     "winner_id": match.winner_id,
+                    "order": match.order,
+                    "is_ongoing": match.is_ongoing,
                     "is_bye": match.is_bye,
                     "bye_description": match.bye_description,
-                    "is_ongoing": match.is_ongoing
-                })
+                    "is_third_place": match.is_third_place
+                }
 
+                match_data.append(match_info)
+            
             bracket_data.append({
-                "id": round.id,
+                "round_id": round.id,
                 "round_number": round.round_number,
                 "name": round.name,
                 "matches": match_data
             })
-
-        return {"success": True, "bracket": bracket_data}
+        
+        return {"rounds": bracket_data}
         
     except Exception as e:
         logger.error(f"Error getting tournament bracket: {str(e)}")
@@ -598,50 +602,6 @@ async def delete_team(team_id: int, db: Session = Depends(get_db)):
     db.delete(team)
     db.commit()
     return {"success": True}
-
-@app.get("/tournament/{tournament_id}/bracket")
-async def get_tournament_bracket(tournament_id: int, db: Session = Depends(get_db)):
-    tournament = db.query(Tournament).filter(Tournament.id == tournament_id).first()
-    if not tournament:
-        raise HTTPException(status_code=404, detail="Tournament not found")
-
-    rounds = db.query(Round).filter(Round.tournament_id == tournament_id).order_by(Round.round_number).all()  # Changed from Round.number to Round.round_number
-
-    if not rounds:
-        return {"message": "Bracket has not been created yet", "bracket": []}
-
-    teams = db.query(Team).filter(Team.tournament_id == tournament_id).all()
-    
-    bracket_data = []
-    for round in rounds:
-        matches = db.query(Match).filter(Match.round_id == round.id).order_by(Match.position).all()
-        round_data = {
-            "round_number": round.round_number,
-            "matches": [
-                {
-                    "id": match.id,
-                    "team1": match.team1.name if match.team1 else "TBD",
-                    "team2": match.team2.name if match.team2 else "TBD",
-                    "team1_id": match.team1.id if match.team1 else None,
-                    "team2_id": match.team2.id if match.team2 else None,
-                    "team1_score": match.team1_score if match.team1_score is not None else "",
-                    "team2_score": match.team2_score if match.team2_score is not None else "",
-                    "winner": match.winner.name if match.winner else None,
-                    "winner_id": match.winner.id if match.winner else None,
-                    "position": match.position,
-                    "is_ongoing": match.is_ongoing,
-                    "is_bye": match.is_bye,  # Add this line
-                    "bye_description": match.bye_description  # Add this line
-                }
-                for match in matches
-            ]
-        }
-        bracket_data.append(round_data)
-
-    return {
-        "bracket": bracket_data,
-        "teams": [{"id": team.id, "name": team.name} for team in teams]
-    }
 
 @app.post("/admin/remove_bracket/{tournament_id}")
 async def remove_bracket(tournament_id: int, db: Session = Depends(get_db)):
@@ -840,20 +800,23 @@ async def add_match(
     db: Session = Depends(get_db)
 ):
     try:
-        # Get the round
         round_id = match_data.get('round_id')
         round = db.query(Round).filter(Round.id == round_id).first()
         if not round:
             raise HTTPException(status_code=404, detail="Round not found")
 
-        # Create new match
+        # Get the current max order for this round
+        max_order = db.query(func.max(Match.order)).filter(Match.round_id == round_id).scalar() or -1
+        
+        # Create new match with incremented order
         new_match = Match(
             round_id=round_id,
-            team1_id=match_data.get('team1_id') if match_data.get('team1_id') != "" else None,  # Allow None for TBD
-            team2_id=match_data.get('team2_id') if match_data.get('team2_id') != "" else None,  # Allow None for TBD
+            team1_id=match_data.get('team1_id') if match_data.get('team1_id') != "" else None,
+            team2_id=match_data.get('team2_id') if match_data.get('team2_id') != "" else None,
             is_bye=match_data.get('is_bye', False),
             bye_description=match_data.get('bye_description') if match_data.get('is_bye') else None,
-            is_third_place=match_data.get('is_third_place', False)
+            is_third_place=match_data.get('is_third_place', False),
+            order=max_order + 1  # Set the order
         )
         
         db.add(new_match)
@@ -878,10 +841,13 @@ async def get_tournament_teams(tournament_id: int, db: Session = Depends(get_db)
 @app.get("/admin/round/{round_id}/matches")
 async def get_round_matches(round_id: int, db: Session = Depends(get_db)):
     try:
-        matches = db.query(Match).filter(Match.round_id == round_id).all()
         round = db.query(Round).filter(Round.id == round_id).first()
+        if not round:
+            raise HTTPException(status_code=404, detail="Round not found")
         
-        # Get all teams from the tournament
+        # Add order by Match.order to maintain consistent ordering
+        matches = db.query(Match).filter(Match.round_id == round_id).order_by(Match.order).all()
+        
         tournament_teams = db.query(Team).filter(Team.tournament_id == round.tournament_id).all()
         available_teams = [{"id": team.id, "name": team.name} for team in tournament_teams]
         
@@ -905,9 +871,10 @@ async def get_round_matches(round_id: int, db: Session = Depends(get_db)):
                 "winner_id": match.winner_id,
                 "is_bye": match.is_bye,
                 "bye_description": match.bye_description,
-                "is_third_place": match.is_third_place,  # Replace title with is_third_place
+                "is_third_place": match.is_third_place,
                 "available_teams": available_teams,
-                "is_final_round": is_final_round
+                "is_final_round": is_final_round,
+                "order": match.order  # Include order in the response
             })
             
         return match_data
@@ -950,6 +917,156 @@ async def delete_match(match_id: int, db: Session = Depends(get_db)):
         db.rollback()
         logger.error(f"Error deleting match: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/admin/tournament/{tournament_id}/delete_bracket")
+async def delete_tournament_bracket(tournament_id: int, db: Session = Depends(get_db)):
+    try:
+        # Delete all matches in all rounds
+        rounds = db.query(Round).filter(Round.tournament_id == tournament_id).all()
+        for round in rounds:
+            db.query(Match).filter(Match.round_id == round.id).delete(synchronize_session=False)
+        
+        # Delete all rounds
+        db.query(Round).filter(Round.tournament_id == tournament_id).delete(synchronize_session=False)
+        
+        db.commit()
+        return {"success": True, "message": "Bracket deleted successfully"}
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Error deleting bracket: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/admin/team/{team_id}/update")
+async def update_team(team_id: int, data: dict = Body(...), db: Session = Depends(get_db)):
+    try:
+        team = db.query(Team).filter(Team.id == team_id).first()
+        if not team:
+            raise HTTPException(status_code=404, detail="Team not found")
+        
+        team.name = data.get('name')
+        db.commit()
+        return {"success": True}
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/admin/team/{team_id}/player/{player_id}/remove")
+async def remove_player(team_id: int, player_id: int, db: Session = Depends(get_db)):
+    try:
+        player = db.query(Player).filter(Player.id == player_id, Player.team_id == team_id).first()
+        if not player:
+            raise HTTPException(status_code=404, detail="Player not found")
+        
+        db.delete(player)
+        db.commit()
+        return {"success": True}
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/admin/team/{team_id}/player/add")
+async def add_player(team_id: int, data: dict = Body(...), db: Session = Depends(get_db)):
+    try:
+        team = db.query(Team).filter(Team.id == team_id).first()
+        if not team:
+            raise HTTPException(status_code=404, detail="Team not found")
+        
+        new_player = Player(name=data.get('name'), team_id=team_id)
+        db.add(new_player)
+        db.commit()
+        db.refresh(new_player)
+        
+        return {"success": True, "player_id": new_player.id}
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/admin/team/{team_id}/delete")
+async def delete_team(team_id: int, db: Session = Depends(get_db)):
+    try:
+        team = db.query(Team).filter(Team.id == team_id).first()
+        if not team:
+            raise HTTPException(status_code=404, detail="Team not found")
+        
+        # Delete all players first
+        db.query(Player).filter(Player.team_id == team_id).delete(synchronize_session=False)
+        
+        # Remove team from any matches
+        matches = db.query(Match).filter(
+            (Match.team1_id == team_id) | 
+            (Match.team2_id == team_id) |
+            (Match.winner_id == team_id)
+        ).all()
+        
+        for match in matches:
+            if match.team1_id == team_id:
+                match.team1_id = None
+            if match.team2_id == team_id:
+                match.team2_id = None
+            if match.winner_id == team_id:
+                match.winner_id = None
+        
+        # Delete the team
+        db.delete(team)
+        db.commit()
+        return {"success": True}
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/admin/round/{round_id}/match")
+async def add_match(round_id: int, data: dict = Body(...), db: Session = Depends(get_db)):
+    try:
+        # Get the round
+        round = db.query(Round).filter(Round.id == round_id).first()
+        if not round:
+            raise HTTPException(status_code=404, detail="Round not found")
+
+        # Get the current highest order in this round
+        max_order = db.query(func.max(Match.order)).filter(Match.round_id == round_id).scalar() or 0
+
+        # Create new match
+        new_match = Match(
+            round_id=round_id,
+            team1_id=data.get('team1_id'),  # Allow None
+            team2_id=data.get('team2_id'),  # Allow None
+            is_bye=data.get('is_bye', False),
+            bye_description=data.get('bye_description'),
+            is_third_place=data.get('is_third_place', False),
+            order=max_order + 1
+        )
+
+        db.add(new_match)
+        db.commit()
+        db.refresh(new_match)
+
+        return {"success": True, "match_id": new_match.id}
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Error adding match: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/debug/tournaments")
+async def debug_tournaments(db: Session = Depends(get_db)):
+    tournaments = db.query(Tournament).all()
+    return [{
+        "id": t.id,
+        "name": t.name,
+        "is_active": t.is_active,
+        "is_archived": t.is_archived
+    } for t in tournaments]
+
+@app.get("/debug/active_tournament")
+async def debug_active_tournament(db: Session = Depends(get_db)):
+    tournament = db.query(Tournament).filter(Tournament.is_active == True).first()
+    if tournament:
+        return {
+            "id": tournament.id,
+            "name": tournament.name,
+            "is_active": tournament.is_active,
+            "description": tournament.description
+        }
+    return {"message": "No active tournament found"}
 
 if __name__ == "__main__":
     import uvicorn

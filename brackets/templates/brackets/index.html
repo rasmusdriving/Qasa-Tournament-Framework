@@ -9,153 +9,119 @@
     <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
     <style>
         body {
-            background-color: #1a1a2e;
+            background-color: #1e213a;
             color: #e6e6e6;
             font-family: 'Inter', sans-serif;
+            min-height: 100vh;
         }
 
         .bracket-container {
+            position: relative;
             display: flex;
-            overflow-x: auto;
-            padding: 2rem;
-            gap: 3rem;
-            min-height: 600px;
-            align-items: stretch;
+            padding: 0.5rem;
+            /* Further reduce padding */
+            gap: 2rem;
+            /* Further reduce gap between rounds */
+            height: 80vh;
+            /* Set a fixed height to fit within the viewport */
+            align-items: flex-start;
+            justify-content: center;
+            margin: 0 auto;
+            max-width: 1000px;
+            /* Further reduce max width */
+            padding-top: 1rem;
         }
 
         .round-column {
             display: flex;
             flex-direction: column;
-            min-width: 320px;
-            gap: 2rem;
+            justify-content: space-between;
+            /* Distribute space evenly */
+            height: 100%;
+            position: relative;
+            padding-top: 0.5rem;
+            /* Further reduce padding for the title */
         }
 
-        .round-header {
+        .round-column h3 {
+            position: static;
             text-align: center;
-            padding: 1rem;
-            background: linear-gradient(135deg, #2a2a5a 0%, #16213e 100%);
-            border-radius: 0.75rem;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2);
+            margin-bottom: 0.5rem;
+            /* Further reduce margin */
         }
 
         .match-card {
+            display: flex;
+            flex-direction: column;
+            width: 150px;
             background: linear-gradient(135deg, #16213e 0%, #1a1a2e 100%);
-            border-radius: 1rem;
-            padding: 1.5rem;
-            position: relative;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2);
-            transition: transform 0.3s ease;
+            border-radius: 0.25rem;
+            padding: 0.25rem;
+            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+            margin: 0.25rem 0;
         }
 
-        .match-card:hover {
-            transform: translateY(-4px);
+        .match-card.finals {
+            transform: scale(1.05);
+            /* Further reduce scale */
+            border: 2px solid #ffd700;
         }
 
         .team-container {
             display: flex;
-            align-items: center;
-            padding: 0.75rem;
-            margin: 0.5rem 0;
-            border-radius: 0.5rem;
+            flex-direction: column;
+            align-items: flex-start;
+            padding: 0.1rem;
+            margin: 0.1rem 0;
+            border-radius: 0.1rem;
             background: rgba(255, 255, 255, 0.05);
-            position: relative;
-        }
-
-        .team-info {
-            flex-grow: 1;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
         }
 
         .team-name {
+            font-size: 0.8rem;
             font-weight: 600;
-            color: #e6e6e6;
+            margin-bottom: 0.2rem;
+        }
+
+        .player-cards {
+            display: flex;
+            gap: 0.1rem;
         }
 
         .team-score {
-            font-size: 1.25rem;
+            font-size: 1rem;
             font-weight: 700;
             color: #4CAF50;
-            min-width: 2.5rem;
-            text-align: center;
+            margin-left: auto;
         }
 
-        .match-connector {
-            position: absolute;
-            right: -3rem;
-            width: 3rem;
-            height: 2px;
-            background: #4CAF50;
-            top: 50%;
+        .player-card {
+            width: 20px;
+            /* Further reduce size */
+            height: 20px;
         }
 
-        .match-status {
-            position: absolute;
-            top: -0.75rem;
-            left: 50%;
-            transform: translateX(-50%);
-            padding: 0.25rem 0.75rem;
-            border-radius: 1rem;
-            font-size: 0.75rem;
-            font-weight: 600;
-            z-index: 1;
-        }
-
-        .status-ongoing {
-            background: #f44336;
-            color: white;
-            animation: pulse 2s infinite;
-        }
-
-        .status-completed {
-            background: #4CAF50;
-            color: white;
+        .round-bye-matches {
+            margin-top: auto;
+            /* Push bye matches to the bottom */
+            padding-top: 0.5rem;
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
         }
 
         .bye-match {
-            opacity: 0.6;
-        }
-
-        .winner-indicator {
-            position: absolute;
-            right: -0.5rem;
-            top: 50%;
-            transform: translateY(-50%);
-            width: 0.5rem;
-            height: 0.5rem;
-            background: #4CAF50;
-            border-radius: 50%;
-        }
-
-        @keyframes pulse {
-            0% {
-                opacity: 1;
-            }
-
-            50% {
-                opacity: 0.6;
-            }
-
-            100% {
-                opacity: 1;
-            }
-        }
-
-        @media (max-width: 768px) {
-            .bracket-container {
-                padding: 1rem;
-                gap: 1.5rem;
-            }
-
-            .round-column {
-                min-width: 280px;
-            }
+            margin-bottom: 0.5rem;
+            background: rgba(22, 33, 62, 0.8);
         }
     </style>
 </head>
 
 <body>
+    {% if tournament %}
+    <script>
+        const tournamentId = {{ tournament.id }};  // Add this line to define tournamentId
+    </script>
+    {% endif %}
+
     <div class="container mx-auto px-4 py-8">
         <h1 class="text-4xl font-bold mb-8 text-center text-purple-400">Tournament Tracker</h1>
 
@@ -170,69 +136,115 @@
         </div>
 
         <script>
-            function updateBracket() {
-                $.getJSON("/tournament/{{ tournament.id }}/bracket", function (data) {
-                    const bracket = $("#bracket");
-                    bracket.empty();
+            function loadBracket() {
+                const bracketContainer = $('.bracket-container');
+                bracketContainer.empty();
 
-                    if (data.message) {
-                        bracket.append(`<p class="text-xl text-center text-gray-300">${data.message}</p>`);
-                        return;
-                    }
-
-                    data.bracket.forEach((round, roundIndex) => {
-                        const roundColumn = $('<div class="round-column"></div>');
-                        const roundName = round.name || `Round ${round.round_number}`;
-
-                        roundColumn.append(`
-                            <div class="round-header">
-                                <h3 class="text-xl font-semibold">${roundName}</h3>
-                            </div>
-                        `);
-
-                        round.matches.sort((a, b) => a.position - b.position);
-
-                        round.matches.forEach(match => {
-                            const matchCard = $(`
-                                <div class="match-card ${match.is_bye ? 'bye-match' : ''}">
-                                    ${match.is_ongoing ? '<div class="match-status status-ongoing">LIVE</div>' : ''}
-                                    ${match.winner ? '<div class="match-status status-completed">COMPLETED</div>' : ''}
-                                    ${match.is_bye ? `
-                                        <div class="text-center text-gray-400 py-4">
-                                            <p class="font-semibold">BYE</p>
-                                            <p class="text-sm mt-2">${match.bye_description || ''}</p>
-                                        </div>
-                                    ` : `
-                                        <div class="team-container">
-                                            <div class="team-info">
-                                                <span class="team-name">${match.team1 || 'TBD'}</span>
-                                                <span class="team-score">${match.team1_score}</span>
-                                            </div>
-                                            ${match.winner === match.team1 ? '<div class="winner-indicator"></div>' : ''}
-                                        </div>
-                                        <div class="team-container">
-                                            <div class="team-info">
-                                                <span class="team-name">${match.team2 || 'TBD'}</span>
-                                                <span class="team-score">${match.team2_score}</span>
-                                            </div>
-                                            ${match.winner === match.team2 ? '<div class="winner-indicator"></div>' : ''}
-                                        </div>
-                                    `}
-                                    ${roundIndex < data.bracket.length - 1 ? '<div class="match-connector"></div>' : ''}
+                fetch(`/tournament/${tournamentId}/bracket`)
+                    .then(response => response.json())
+                    .then(data => {
+                        data.rounds.forEach((round, roundIndex) => {
+                            const roundColumn = $(`
+                                <div class="round-column">
+                                    <h3 class="text-xl font-bold mb-4">${round.name || `Round ${round.round_number}`}</h3>
+                                    <div class="matches-container">
+                                        ${renderNormalMatches(round.matches.filter(m => !m.is_bye))}
+                                    </div>
+                                    ${renderByeMatchesSection(round.matches.filter(m => m.is_bye), round.round_number)}
                                 </div>
                             `);
-
-                            roundColumn.append(matchCard);
+                            bracketContainer.append(roundColumn);
                         });
-
-                        bracket.append(roundColumn);
                     });
-                });
+            }
+
+            function renderNormalMatches(matches) {
+                return matches.map(match => `
+                    <div class="match-card">
+                        ${renderMatch(match)}
+                    </div>
+                `).join('');
+            }
+
+            function renderByeMatchesSection(byeMatches, roundNumber) {
+                if (!byeMatches || byeMatches.length === 0) return '';
+
+                return `
+                    <div class="round-bye-matches">
+                        <h4>Round ${roundNumber} Byes</h4>
+                        ${byeMatches.map(match => `
+                            <div class="bye-match">
+                                ${renderByeMatch(match)}
+                            </div>
+                        `).join('')}
+                    </div>
+                `;
+            }
+
+            function renderMatch(match) {
+                if (!match) return '';
+
+                return `
+                    <div class="match-card">
+                        ${renderTeam(match.team1, match.team1_score, match.winner_id === match.team1?.id)}
+                        ${renderTeam(match.team2, match.team2_score, match.winner_id === match.team2?.id)}
+                    </div>
+                `;
+            }
+
+            function renderByeMatch(match) {
+                return `
+                    <div class="team-container">
+                        <div class="team-name">${match.team1?.name || 'TBD'}</div>
+                        <div class="player-cards">
+                            ${match.team1?.players.map(player => `
+                                <div class="player-card">
+                                    <img src="/static/player_images/${player.name}.png" alt="${player.name}">
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+                    <div class="bye-description text-gray-400 italic mt-2">
+                        ${match.bye_description || 'Bye Match'}
+                    </div>
+                `;
+            }
+
+            function renderTeam(team, score, isWinner) {
+                if (!team) {
+                    return `
+                        <div class="team-container tbd-placeholder">
+                            <div class="team-name">TBD</div>
+                            <div class="player-cards">
+                                <div class="player-card">
+                                    <img src="/static/player_images/TBD.png" alt="TBD">
+                                </div>
+                            </div>
+                            <div class="team-score">0</div>
+                        </div>
+                    `;
+                }
+
+                return `
+                    <div class="team-container">
+                        <div class="team-name">${team.name}</div>
+                        <div class="player-cards">
+                            ${team.players.map(player => `
+                                <div class="player-card">
+                                    <img src="/static/player_images/${player.name}.png" alt="${player.name}">
+                                </div>
+                            `).join('')}
+                        </div>
+                        <div class="team-score">${score || '0'}</div>
+                        ${isWinner ? '<div class="winner-indicator"></div>' : ''}
+                    </div>
+                `;
             }
 
             $(document).ready(function () {
-                updateBracket();
-                setInterval(updateBracket, 5000); // Update every 5 seconds
+                if (typeof tournamentId !== 'undefined') {
+                    loadBracket();
+                }
             });
         </script>
 

@@ -81,3 +81,4 @@ class Match(Base):
     winner = relationship("Team", foreign_keys=[winner_id])
     is_ongoing = Column(Boolean, default=False, nullable=False)
     is_third_place = Column(Boolean, default=False)  # Add this line instead of title
+    order = Column(Integer, nullable=False, default=0)

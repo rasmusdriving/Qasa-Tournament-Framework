@@ -66,6 +66,8 @@
                                 <span class="team-name" data-team-id="{{ team.id }}">{{ team.name }}</span>
                                 <button class="edit-team-btn text-blue-500 hover:text-blue-700 ml-2"
                                     onclick="editTeam({{ team.id }})">Edit</button>
+                                <button class="delete-team-btn text-red-500 hover:text-red-700 ml-2"
+                                    onclick="deleteTeam({{ team.id }})">Delete Team</button>
                             </h5>
                             <ul class="list-disc list-inside" id="team-players-{{ team.id }}">
                                 {% for player in team.players %}
@@ -164,10 +166,6 @@
                         class="bg-purple-500 hover:bg-purple-700 text-white font-bold py-2 px-4 rounded mr-2">
                         Generate Bracket
                     </button>
-                    <button onclick="showCreateBracketModal('{{ tournament.id }}')"
-                        class="bg-purple-500 hover:bg-purple-700 text-white font-bold py-2 px-4 rounded mr-2">
-                        Create Bracket
-                    </button>
                     <button onclick="deleteBracket('{{ tournament.id }}')"
                         class="bg-red-500 hover:bg-red-700 text-white font-bold py-2 px-4 rounded">
                         Delete Bracket
@@ -220,19 +218,20 @@
 
     <!-- Create Bracket Modal -->
     <div id="createBracketModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 hidden items-center justify-center">
-        <div class="bg-white p-8 rounded-lg shadow-xl max-w-lg w-full">
+        <div class="bg-white p-8 rounded-lg shadow-xl max-w-md w-full">
             <h3 class="text-xl font-bold mb-4">Create Tournament Bracket</h3>
             <div class="mb-4">
                 <label class="block text-sm font-medium text-gray-700 mb-2">Number of Rounds</label>
-                <input type="number" id="roundCount" min="1" value="1" class="w-full px-3 py-2 border rounded-md">
+                <input type="number" id="roundCount" min="1" value="1"
+                    class="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500">
             </div>
-            <div class="flex justify-end gap-2">
+            <div class="flex justify-end gap-4">
                 <button onclick="closeCreateBracketModal()"
                     class="bg-gray-500 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded">
                     Cancel
                 </button>
                 <button onclick="createBracket()"
-                    class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded">
+                    class="bg-purple-500 hover:bg-purple-700 text-white font-bold py-2 px-4 rounded">
                     Create
                 </button>
             </div>
@@ -250,6 +249,8 @@
                     <option value="bye">Bye Match</option>
                 </select>
             </div>
+
+            <!-- Normal Match Fields -->
             <div id="normalMatchFields">
                 <div class="mb-4">
                     <label class="block text-sm font-medium text-gray-700 mb-2">Team 1</label>
@@ -260,24 +261,27 @@
                     <select id="team2Select" class="w-full px-3 py-2 border rounded-md"></select>
                 </div>
             </div>
-            <div id="byeMatchFields" class="hidden">
+
+            <!-- Bye Match Fields -->
+            <div id="byeMatchFields" style="display: none;">
                 <div class="mb-4">
                     <label class="block text-sm font-medium text-gray-700 mb-2">Team</label>
                     <select id="byeTeamSelect" class="w-full px-3 py-2 border rounded-md"></select>
                 </div>
                 <div class="mb-4">
-                    <label class="block text-sm font-medium text-gray-700 mb-2">Description</label>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Bye Description</label>
                     <input type="text" id="byeDescription" class="w-full px-3 py-2 border rounded-md"
-                        placeholder="Optional description">
+                        placeholder="Enter bye description">
                 </div>
             </div>
-            <div class="flex justify-end gap-2">
+
+            <div class="flex justify-end gap-4">
                 <button onclick="closeAddMatchModal()"
                     class="bg-gray-500 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded">
                     Cancel
                 </button>
-                <button onclick="submitNewMatch()"
-                    class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded">
+                <button onclick="addMatch()"
+                    class="bg-green-500 hover:bg-green-700 text-white font-bold py-2 px-4 rounded">
                     Add Match
                 </button>
             </div>
@@ -302,15 +306,15 @@
         // Add all other JavaScript functions here
         function toggleMatchFields() {
             const matchType = document.getElementById('matchType').value;
-            const normalFields = document.getElementById('normalMatchFields');
-            const byeFields = document.getElementById('byeMatchFields');
+            const normalMatchFields = document.getElementById('normalMatchFields');
+            const byeMatchFields = document.getElementById('byeMatchFields');
 
             if (matchType === 'normal') {
-                normalFields.classList.remove('hidden');
-                byeFields.classList.add('hidden');
+                normalMatchFields.style.display = 'block';
+                byeMatchFields.style.display = 'none';
             } else {
-                normalFields.classList.add('hidden');
-                byeFields.classList.remove('hidden');
+                normalMatchFields.style.display = 'none';
+                byeMatchFields.style.display = 'block';
             }
         }
 
@@ -319,8 +323,8 @@
             currentTournamentId = tournamentId;
             currentIsThirdPlace = isThirdPlace;
 
-            // Fetch teams for the tournament
-            fetch(`/admin/teams/${tournamentId}`)
+            // Update the endpoint to use the correct path
+            fetch(`/admin/get_teams/${tournamentId}`)
                 .then(response => {
                     if (!response.ok) {
                         throw new Error('Failed to fetch teams');
@@ -349,19 +353,20 @@
                     if (isThirdPlace) {
                         matchTypeSelect.value = 'normal';
                         matchTypeSelect.disabled = true;
-                        toggleMatchFields();
+                        document.getElementById('normalMatchFields').style.display = 'block';
+                        document.getElementById('byeMatchFields').style.display = 'none';
                     } else {
                         matchTypeSelect.disabled = false;
                     }
+
+                    const modal = document.getElementById('addMatchModal');
+                    modal.classList.remove('hidden');
+                    modal.classList.add('flex');
                 })
                 .catch(error => {
                     console.error('Error fetching teams:', error);
                     alert('Error loading teams. Please try again.');
                 });
-
-            const modal = document.getElementById('addMatchModal');
-            modal.classList.remove('hidden');
-            modal.classList.add('flex');
         }
 
         function submitNewMatch() {
@@ -381,12 +386,7 @@
                 const team1Id = document.getElementById('team1Select').value;
                 const team2Id = document.getElementById('team2Select').value;
 
-                // Only validate team selection if it's not a third place match
-                if (!currentIsThirdPlace && (!team1Id || !team2Id)) {
-                    alert('Please select both teams');
-                    return;
-                }
-
+                // Remove the validation check for team selection
                 matchData = {
                     ...matchData,
                     team1_id: team1Id ? parseInt(team1Id) : null,
@@ -397,8 +397,9 @@
                 const byeTeamId = document.getElementById('byeTeamSelect').value;
                 const byeDescription = document.getElementById('byeDescription').value;
 
+                // For bye matches, we still require a team
                 if (!byeTeamId) {
-                    alert('Please select a team');
+                    alert('Please select a team for the bye match');
                     return;
                 }
 
@@ -459,117 +460,99 @@
         }
 
         function loadRoundMatches(roundId) {
-            if (!roundId) {
-                console.error('No round ID provided to loadRoundMatches');
-                return;
-            }
-
-            const container = document.getElementById(`matches-container-${roundId}`);
-            if (!container) {
-                console.error(`Container for round ${roundId} not found`);
-                return;
-            }
-
             fetch(`/admin/round/${roundId}/matches`)
-                .then(response => {
-                    if (!response.ok) {
-                        throw new Error(`HTTP error! status: ${response.status}`);
-                    }
-                    return response.json();
-                })
+                .then(response => response.json())
                 .then(matches => {
-                    if (!Array.isArray(matches)) {
-                        console.error('Received invalid matches data:', matches);
-                        throw new Error('Invalid matches data received');
-                    }
+                    const matchesContainer = document.getElementById(`matches-container-${roundId}`);
+                    if (!matchesContainer) return;
 
-                    container.innerHTML = matches.map(match => `
-                        <div class="match bg-white p-4 rounded shadow-md mb-2 ${match.is_third_place ? 'border-2 border-purple-500' : ''}" 
-                            data-match-id="${match.id}">
-                            ${match.is_third_place ? `
-                                <div class="bg-purple-100 text-purple-700 px-2 py-1 rounded mb-2 font-semibold inline-block">
-                                    Third Place Match
-                                </div>
-                            ` : ''}
-                            ${match.is_bye ? `
-                                <div class="bye-match">
-                                    <p class="font-semibold">Bye Match</p>
-                                    <div class="flex items-center justify-between mb-2">
-                                        <select class="p-1 border rounded w-64" 
-                                            onchange="updateMatchTeam(${match.id}, 'team1', this.value)">
-                                            <option value="">TBD</option>
-                                            ${match.available_teams?.map(team =>
-                        `<option value="${team.id}" ${team.id === match.team1_id ? 'selected' : ''}>
-                                                    ${team.name}
-                                                </option>`
-                    ).join('')}
-                                        </select>
-                                    </div>
-                                    <div class="mb-2">
-                                        <input type="text" 
-                                            value="${match.bye_description || ''}" 
-                                            class="w-full p-1 border rounded"
-                                            placeholder="Bye Description"
-                                            onchange="updateByeDescription(${match.id}, this.value)">
-                                    </div>
-                                    <button onclick="deleteMatch(${match.id})" 
-                                        class="mt-2 bg-red-500 hover:bg-red-700 text-white font-bold py-1 px-2 rounded">
-                                        Delete Match
-                                    </button>
-                                </div>
-                            ` : `
-                                <div class="flex flex-col space-y-2">
+                    let matchesHtml = '';
+                    matches.forEach(match => {
+                        if (match.is_bye) {
+                            // Bye match HTML
+                            matchesHtml += `
+                                <div class="match bg-gray-100 p-4 rounded-md mb-2" data-match-id="${match.id}">
                                     <div class="flex items-center justify-between">
                                         <select class="p-1 border rounded w-64" 
                                             onchange="updateMatchTeam(${match.id}, 'team1', this.value)">
-                                            <option value="">TBD</option>
+                                            <option value="">Select Bye Team</option>
                                             ${match.available_teams?.map(team =>
-                        `<option value="${team.id}" ${team.id === match.team1_id ? 'selected' : ''}>
-                                                    ${team.name}
-                                                </option>`
-                    ).join('')}
-                                        </select>
-                                        <input type="number" value="${match.team1_score || ''}" 
-                                            class="w-16 ml-2 p-1 border rounded"
-                                            onchange="updateMatchScore(${match.id}, 'team1', this.value)"
-                                            ${!match.team1_id ? 'disabled' : ''}>
-                                    </div>
-                                    <div class="flex items-center justify-between">
-                                        <select class="p-1 border rounded w-64" 
-                                            onchange="updateMatchTeam(${match.id}, 'team2', this.value)">
-                                            <option value="">TBD</option>
-                                            ${match.available_teams?.map(team =>
-                        `<option value="${team.id}" ${team.id === match.team2_id ? 'selected' : ''}>
-                                                    ${team.name}
-                                                </option>`
-                    ).join('')}
-                                        </select>
-                                        <input type="number" value="${match.team2_score || ''}" 
-                                            class="w-16 ml-2 p-1 border rounded"
-                                            onchange="updateMatchScore(${match.id}, 'team2', this.value)"
-                                            ${!match.team2_id ? 'disabled' : ''}>
-                                    </div>
-                                    <div class="flex items-center justify-between mt-2">
-                                        <select class="p-1 border rounded" 
-                                            onchange="updateMatchWinner(${match.id}, this.value)"
-                                            ${(!match.team1_id || !match.team2_id) ? 'disabled' : ''}>
-                                            <option value="">Select Winner</option>
-                                            ${match.team1_id ? `<option value="${match.team1_id}" ${match.winner_id === match.team1_id ? 'selected' : ''}>${match.team1_name}</option>` : ''}
-                                            ${match.team2_id ? `<option value="${match.team2_id}" ${match.winner_id === match.team2_id ? 'selected' : ''}>${match.team2_name}</option>` : ''}
+                                `<option value="${team.id}" ${team.id === match.team1_id ? 'selected' : ''}>
+                                                ${team.name}
+                                            </option>`
+                            ).join('')}
                                         </select>
                                         <button onclick="deleteMatch(${match.id})" 
-                                            class="bg-red-500 hover:bg-red-700 text-white font-bold py-1 px-2 rounded">
-                                            Delete Match
-                                        </button>
+                                            class="text-red-500 hover:text-red-700">Delete</button>
                                     </div>
-                                </div>
-                            `}
-                        </div>
-                    `).join('');
+                                    <div class="mt-2">
+                                        <input type="text" value="${match.bye_description || ''}" 
+                                            class="w-full p-1 border rounded"
+                                            onchange="updateMatchByeDescription(${match.id}, this.value)"
+                                            placeholder="Bye Description">
+                                    </div>
+                                </div>`;
+                        } else {
+                            // Normal match HTML
+                            matchesHtml += `
+                                <div class="match bg-gray-100 p-4 rounded-md mb-2" data-match-id="${match.id}">
+                                    <div class="flex items-center justify-between mb-2">
+                                        <div class="flex-1">
+                                            <select class="p-1 border rounded w-64" 
+                                                onchange="updateMatchTeam(${match.id}, 'team1', this.value)">
+                                                <option value="">Select Team 1</option>
+                                                ${match.available_teams?.map(team =>
+                                `<option value="${team.id}" ${team.id === match.team1_id ? 'selected' : ''}>
+                                                ${team.name}
+                                            </option>`
+                            ).join('')}
+                                            </select>
+                                            <input type="number" value="${match.team1_score || 0}" 
+                                                class="w-16 p-1 border rounded ml-2"
+                                                onchange="updateMatchScore(${match.id}, 'team1', this.value)"
+                                                placeholder="Score">
+                                        </div>
+                                        <div class="mx-4">vs</div>
+                                        <div class="flex-1">
+                                            <select class="p-1 border rounded w-64" 
+                                                onchange="updateMatchTeam(${match.id}, 'team2', this.value)">
+                                                <option value="">Select Team 2</option>
+                                                ${match.available_teams?.map(team =>
+                                `<option value="${team.id}" ${team.id === match.team2_id ? 'selected' : ''}>
+                                                ${team.name}
+                                            </option>`
+                            ).join('')}
+                                            </select>
+                                            <input type="number" value="${match.team2_score || 0}" 
+                                                class="w-16 p-1 border rounded ml-2"
+                                                onchange="updateMatchScore(${match.id}, 'team2', this.value)"
+                                                placeholder="Score">
+                                        </div>
+                                        <button onclick="deleteMatch(${match.id})" 
+                                            class="text-red-500 hover:text-red-700 ml-4">Delete</button>
+                                    </div>
+                                    <div class="flex justify-center">
+                                        <select class="p-1 border rounded w-64" 
+                                            onchange="updateMatchWinner(${match.id}, this.value)">
+                                            <option value="">Select Winner</option>
+                                            ${match.team1_id ?
+                                    `<option value="${match.team1_id}" ${match.winner_id === match.team1_id ? 'selected' : ''}>
+                                            ${match.team1_name}
+                                        </option>` : ''}
+                                            ${match.team2_id ?
+                                    `<option value="${match.team2_id}" ${match.winner_id === match.team2_id ? 'selected' : ''}>
+                                            ${match.team2_name}
+                                        </option>` : ''}
+                                        </select>
+                                    </div>
+                                </div>`;
+                        }
+                    });
+                    matchesContainer.innerHTML = matchesHtml;
                 })
                 .catch(error => {
                     console.error('Error loading matches:', error);
-                    container.innerHTML = '<p class="text-red-500">Error loading matches</p>';
+                    alert('Error loading matches. Please try again.');
                 });
         }
 
@@ -751,8 +734,250 @@
                 });
         }
 
+        function toggleEditForm(tournamentId) {
+            const form = document.getElementById(`edit-form-${tournamentId}`);
+            if (form.classList.contains('hidden')) {
+                form.classList.remove('hidden');
+            } else {
+                form.classList.add('hidden');
+            }
+        }
+
         // Add other functions...
 
+        function deleteBracket(tournamentId) {
+            if (!confirm('Are you sure you want to delete this bracket? This will remove all matches and rounds.')) {
+                return;
+            }
+
+            fetch(`/admin/tournament/${tournamentId}/delete_bracket`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                }
+            })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        // Reload the page to show updated state
+                        window.location.reload();
+                    } else {
+                        throw new Error(data.detail || 'Failed to delete bracket');
+                    }
+                })
+                .catch(error => {
+                    console.error('Error deleting bracket:', error);
+                    alert('Error deleting bracket. Please try again.');
+                });
+        }
+
+        // Add this function with the other JavaScript functions
+        function generateBracket(tournamentId) {
+            currentTournamentId = tournamentId;
+            const modal = document.getElementById('createBracketModal');
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+        }
+
+        function closeCreateBracketModal() {
+            const modal = document.getElementById('createBracketModal');
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
+            currentTournamentId = null;
+        }
+
+        function createBracket() {
+            if (!currentTournamentId) return;
+
+            const roundCount = document.getElementById('roundCount').value;
+            if (roundCount < 1) {
+                alert('Please enter a valid number of rounds');
+                return;
+            }
+
+            fetch(`/admin/generate_bracket/${currentTournamentId}`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    round_count: parseInt(roundCount)
+                })
+            })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        closeCreateBracketModal();
+                        window.location.reload();
+                    } else {
+                        throw new Error(data.detail || 'Failed to create bracket');
+                    }
+                })
+                .catch(error => {
+                    console.error('Error creating bracket:', error);
+                    alert('Error creating bracket. Please try again.');
+                    closeCreateBracketModal();
+                });
+        }
+
+        // Add this function to handle team name editing
+        function editTeam(teamId) {
+            const teamNameSpan = document.querySelector(`.team-name[data-team-id="${teamId}"]`);
+            const currentName = teamNameSpan.textContent;
+            const newName = prompt("Enter new team name:", currentName);
+
+            if (newName && newName !== currentName) {
+                fetch(`/admin/team/${teamId}/update`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ name: newName })
+                })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.success) {
+                            teamNameSpan.textContent = newName;
+                        } else {
+                            throw new Error(data.detail || 'Failed to update team name');
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Error updating team name:', error);
+                        alert('Error updating team name. Please try again.');
+                    });
+            }
+        }
+
+        function removePlayer(teamId, playerId) {
+            if (!confirm('Are you sure you want to remove this player?')) {
+                return;
+            }
+
+            fetch(`/admin/team/${teamId}/player/${playerId}/remove`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                }
+            })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        const playerElement = document.querySelector(`button[onclick="removePlayer(${teamId}, ${playerId})"]`).parentNode;
+                        playerElement.remove();
+                    } else {
+                        throw new Error(data.detail || 'Failed to remove player');
+                    }
+                })
+                .catch(error => {
+                    console.error('Error removing player:', error);
+                    alert('Error removing player. Please try again.');
+                });
+        }
+
+        function addPlayer(teamId) {
+            const playerName = prompt("Enter player name:");
+            if (playerName) {
+                fetch(`/admin/team/${teamId}/player/add`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ name: playerName })
+                })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.success) {
+                            const playersList = document.getElementById(`team-players-${teamId}`);
+                            const newPlayerHtml = `
+                            <li>
+                                <span class="player-name">${playerName}</span>
+                                <button class="remove-player-btn text-red-500 hover:text-red-700 ml-2"
+                                    onclick="removePlayer(${teamId}, ${data.player_id})">Remove</button>
+                            </li>
+                        `;
+                            playersList.insertAdjacentHTML('beforeend', newPlayerHtml);
+                        } else {
+                            throw new Error(data.detail || 'Failed to add player');
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Error adding player:', error);
+                        alert('Error adding player. Please try again.');
+                    });
+            }
+        }
+
+        function deleteTeam(teamId) {
+            if (!confirm('Are you sure you want to delete this team? This will remove all players and the team from any matches.')) {
+                return;
+            }
+
+            fetch(`/admin/team/${teamId}/delete`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                }
+            })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        window.location.reload(); // Reload to update the UI
+                    } else {
+                        throw new Error(data.detail || 'Failed to delete team');
+                    }
+                })
+                .catch(error => {
+                    console.error('Error deleting team:', error);
+                    alert('Error deleting team. Please try again.');
+                });
+        }
+
+        function addMatch() {
+            const roundId = currentRoundId;
+            const matchType = document.getElementById('matchType').value;
+            const data = {
+                is_third_place: currentIsThirdPlace || false,  // Use currentIsThirdPlace instead of isThirdPlace
+                is_bye: matchType === 'bye'
+            };
+
+            if (matchType === 'bye') {
+                const byeTeamSelect = document.getElementById('byeTeamSelect');
+                const byeDescription = document.getElementById('byeDescription');
+
+                data.team1_id = byeTeamSelect.value ? parseInt(byeTeamSelect.value) : null;
+                data.team2_id = null;
+                data.bye_description = byeDescription.value;
+            } else {
+                const team1Select = document.getElementById('team1Select');
+                const team2Select = document.getElementById('team2Select');
+
+                data.team1_id = team1Select.value ? parseInt(team1Select.value) : null;
+                data.team2_id = team2Select.value ? parseInt(team2Select.value) : null;
+                data.bye_description = null;
+            }
+
+            fetch(`/admin/round/${roundId}/match`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(data)
+            })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        closeAddMatchModal();
+                        loadRoundMatches(roundId);
+                    } else {
+                        throw new Error(data.detail || 'Failed to add match');
+                    }
+                })
+                .catch(error => {
+                    console.error('Error adding match:', error);
+                    alert('Error adding match. Please try again.');
+                });
+        }
     </script>
 </body>
 
