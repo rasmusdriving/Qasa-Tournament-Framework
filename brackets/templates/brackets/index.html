@@ -9,58 +9,61 @@
     <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
     <style>
         body {
-            background-color: #121212;
-            font-family: 'Arial', sans-serif;
-            color: #e0e0e0;
+            background-color: #1a1a2e;
+            color: #e6e6e6;
+            font-family: 'Inter', sans-serif;
         }
 
-        .bracket {
+        .bracket-container {
             display: flex;
-            justify-content: flex-start;
-            padding: 20px;
             overflow-x: auto;
-            background-color: #1e1e1e;
-            border-radius: 8px;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
-            position: relative;
+            padding: 2rem;
+            gap: 3rem;
+            min-height: 600px;
+            align-items: stretch;
         }
 
-        .round {
+        .round-column {
             display: flex;
             flex-direction: column;
-            margin-right: 80px;
-            position: relative;
+            min-width: 320px;
+            gap: 2rem;
         }
 
-        .round-title {
-            font-size: 18px;
-            font-weight: bold;
-            color: #bb86fc;
+        .round-header {
             text-align: center;
-            margin-bottom: 20px;
-            text-transform: uppercase;
+            padding: 1rem;
+            background: linear-gradient(135deg, #2a2a5a 0%, #16213e 100%);
+            border-radius: 0.75rem;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2);
         }
 
-        .match {
-            background-color: #2c2c2c;
-            border: 2px solid #3d3d3d;
-            border-radius: 8px;
-            padding: 10px;
-            margin-bottom: 20px;
-            width: 220px;
+        .match-card {
+            background: linear-gradient(135deg, #16213e 0%, #1a1a2e 100%);
+            border-radius: 1rem;
+            padding: 1.5rem;
             position: relative;
+<<<<<<< Updated upstream
             transition: transform 0.3s ease, box-shadow 0.3s ease;
         }
 
         .match:hover {
             transform: scale(1.05);
             box-shadow: 0 8px 16px rgba(0, 0, 0, 0.3);
+=======
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2);
+            transition: transform 0.3s ease;
         }
 
-        .team {
+        .match-card:hover {
+            transform: translateY(-4px);
+>>>>>>> Stashed changes
+        }
+
+        .team-container {
             display: flex;
-            justify-content: space-between;
             align-items: center;
+<<<<<<< Updated upstream
             color: #e0e0e0;
             margin-bottom: 5px;
             padding: 5px;
@@ -130,82 +133,97 @@
             display: flex;
             justify-content: space-between;
             margin-bottom: 15px;
+=======
+            padding: 0.75rem;
+            margin: 0.5rem 0;
+            border-radius: 0.5rem;
+            background: rgba(255, 255, 255, 0.05);
+            position: relative;
+>>>>>>> Stashed changes
         }
 
         .team-info {
-            width: 48%;
-            text-align: center;
+            flex-grow: 1;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
         }
 
         .team-name {
-            font-weight: bold;
-            font-size: 1.2em;
-            margin-bottom: 10px;
+            font-weight: 600;
+            color: #e6e6e6;
         }
 
-        .team-players {
-            display: flex;
-            flex-wrap: wrap;
-            justify-content: center;
-            margin-bottom: 15px;
-        }
-
-        .bet-button {
-            width: 100%;
-            background-color: #03dac6;
-            border: none;
-            color: #121212;
-            padding: 10px 0;
+        .team-score {
+            font-size: 1.25rem;
+            font-weight: 700;
+            color: #4CAF50;
+            min-width: 2.5rem;
             text-align: center;
-            text-decoration: none;
-            display: inline-block;
-            font-size: 16px;
-            margin-top: 10px;
-            cursor: pointer;
-            border-radius: 4px;
-            transition: background-color 0.3s;
         }
 
-        .bet-button:hover {
-            background-color: #018786;
-        }
-
-        .match.ongoing {
-            animation: pulse 2s infinite;
-            box-shadow: 0 0 10px #4CAF50;
-        }
-
-        .ongoing-indicator {
-            background-color: #FF4136;
-            color: white;
-            padding: 2px 6px;
-            border-radius: 4px;
-            font-size: 0.8em;
-            font-weight: bold;
+        .match-connector {
             position: absolute;
-            top: -10px;
-            /* Move it slightly above the match box */
+            right: -3rem;
+            width: 3rem;
+            height: 2px;
+            background: #4CAF50;
+            top: 50%;
+        }
+
+        .match-status {
+            position: absolute;
+            top: -0.75rem;
             left: 50%;
             transform: translateX(-50%);
-            /* Center it horizontally */
-            z-index: 10;
-            /* Ensure it's above other elements */
+            padding: 0.25rem 0.75rem;
+            border-radius: 1rem;
+            font-size: 0.75rem;
+            font-weight: 600;
+            z-index: 1;
+        }
+
+        .status-ongoing {
+            background: #f44336;
+            color: white;
+            animation: pulse 2s infinite;
+        }
+
+        .status-completed {
+            background: #4CAF50;
+            color: white;
+        }
+
+        .bye-match {
+            opacity: 0.6;
+        }
+
+        .winner-indicator {
+            position: absolute;
+            right: -0.5rem;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 0.5rem;
+            height: 0.5rem;
+            background: #4CAF50;
+            border-radius: 50%;
         }
 
         @keyframes pulse {
             0% {
-                box-shadow: 0 0 0 0 rgba(76, 175, 80, 0.7);
+                opacity: 1;
             }
 
             50% {
-                box-shadow: 0 0 0 10px rgba(76, 175, 80, 0.3);
+                opacity: 0.6;
             }
 
             100% {
-                box-shadow: 0 0 0 0 rgba(76, 175, 80, 0.7);
+                opacity: 1;
             }
         }
 
+<<<<<<< Updated upstream
         .overlay {
             display: none;
             position: fixed;
@@ -218,13 +236,27 @@
         }
 
         /* Remove the .loading class and its animation */
+=======
+        @media (max-width: 768px) {
+            .bracket-container {
+                padding: 1rem;
+                gap: 1.5rem;
+            }
+
+            .round-column {
+                min-width: 280px;
+            }
+        }
+>>>>>>> Stashed changes
     </style>
 </head>
 
-<body class="bg-gray-900">
+<body>
     <div class="container mx-auto px-4 py-8">
         <h1 class="text-4xl font-bold mb-8 text-center text-purple-400">Tournament Tracker</h1>
+
         {% if tournament %}
+<<<<<<< Updated upstream
         <h2 class="text-2xl font-semibold mb-6 text-center text-gray-300">{{ tournament.name }}</h2>
 
         <div id="bracket" class="bracket mb-8"></div>
@@ -239,8 +271,19 @@
                 </div>
                 {% endfor %}
             </div>
+=======
+        <div class="mb-8">
+            <h2 class="text-2xl font-semibold text-center text-gray-300">{{ tournament.name }}</h2>
+            <p class="text-center text-gray-400 mt-2">{{ tournament.description }}</p>
         </div>
+
+        <div id="bracket" class="bracket-container">
+            <!-- Bracket will be populated by JavaScript -->
+>>>>>>> Stashed changes
+        </div>
+
         <script>
+<<<<<<< Updated upstream
             let currentOpenMatchId = null;
             let popupElement = null;
             let overlayElement = null;
@@ -260,27 +303,31 @@
                 });
             }
 
+=======
+>>>>>>> Stashed changes
             function updateBracket() {
                 $.getJSON("/tournament/{{ tournament.id }}/bracket", function (data) {
-                    var bracket = $("#bracket");
+                    const bracket = $("#bracket");
                     bracket.empty();
 
-                    // Create SVG element for connectors
-                    var svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-                    svg.setAttribute("width", "100%");
-                    svg.setAttribute("height", "100%");
-                    svg.style.position = "absolute";
-                    svg.style.top = "0";
-                    svg.style.left = "0";
-                    svg.style.pointerEvents = "none";
-                    bracket.append(svg);
+                    if (data.message) {
+                        bracket.append(`<p class="text-xl text-center text-gray-300">${data.message}</p>`);
+                        return;
+                    }
 
-                    data.bracket.forEach(function (round, roundIndex) {
-                        var roundElement = $('<div class="round"></div>');
-                        roundElement.append(`<h3 class="round-title">Round ${round.round_number}</h3>`);
+                    data.bracket.forEach((round, roundIndex) => {
+                        const roundColumn = $('<div class="round-column"></div>');
+                        const roundName = round.name || `Round ${round.round_number}`;
+
+                        roundColumn.append(`
+                            <div class="round-header">
+                                <h3 class="text-xl font-semibold">${roundName}</h3>
+                            </div>
+                        `);
 
                         round.matches.sort((a, b) => a.position - b.position);
 
+<<<<<<< Updated upstream
                         round.matches.forEach(function (match, matchIndex) {
                             var matchElement = $('<div class="match"></div>');
                             if (match.is_ongoing) {
@@ -327,10 +374,44 @@
                             if (currentOpenMatchId === match.id) {
                                 updatePlayerDetails(match);
                             }
+=======
+                        round.matches.forEach(match => {
+                            const matchCard = $(`
+                                <div class="match-card ${match.is_bye ? 'bye-match' : ''}">
+                                    ${match.is_ongoing ? '<div class="match-status status-ongoing">LIVE</div>' : ''}
+                                    ${match.winner ? '<div class="match-status status-completed">COMPLETED</div>' : ''}
+                                    ${match.is_bye ? `
+                                        <div class="text-center text-gray-400 py-4">
+                                            <p class="font-semibold">BYE</p>
+                                            <p class="text-sm mt-2">${match.bye_description || ''}</p>
+                                        </div>
+                                    ` : `
+                                        <div class="team-container">
+                                            <div class="team-info">
+                                                <span class="team-name">${match.team1 || 'TBD'}</span>
+                                                <span class="team-score">${match.team1_score}</span>
+                                            </div>
+                                            ${match.winner === match.team1 ? '<div class="winner-indicator"></div>' : ''}
+                                        </div>
+                                        <div class="team-container">
+                                            <div class="team-info">
+                                                <span class="team-name">${match.team2 || 'TBD'}</span>
+                                                <span class="team-score">${match.team2_score}</span>
+                                            </div>
+                                            ${match.winner === match.team2 ? '<div class="winner-indicator"></div>' : ''}
+                                        </div>
+                                    `}
+                                    ${roundIndex < data.bracket.length - 1 ? '<div class="match-connector"></div>' : ''}
+                                </div>
+                            `);
+
+                            roundColumn.append(matchCard);
+>>>>>>> Stashed changes
                         });
 
-                        bracket.append(roundElement);
+                        bracket.append(roundColumn);
                     });
+<<<<<<< Updated upstream
 
                     // Draw connectors after all rounds and matches are added
                     setTimeout(function () {
@@ -471,16 +552,26 @@
                 }
             }
 
+=======
+                });
+            }
+
+>>>>>>> Stashed changes
             $(document).ready(function () {
                 updateBracket();
-                setInterval(updateBracket, 5000);  // Update every 5 seconds
+                setInterval(updateBracket, 5000); // Update every 5 seconds
             });
-
-            setInterval(updateOdds, 5000);
-            updateBracket(); // Initial load
         </script>
+
+        <div class="mt-8 text-center">
+            <a href="/betting" class="bg-purple-500 hover:bg-purple-700 text-white font-bold py-2 px-4 rounded">
+                View Betting Details
+            </a>
+        </div>
         {% else %}
-        <p class="text-xl text-center text-gray-600">{{ message }}</p>
+        <div class="bg-gray-800 shadow-md rounded px-8 pt-6 pb-8 mb-4">
+            <p class="text-xl text-center text-gray-300">There is no active tournament at the moment.</p>
+        </div>
         {% endif %}
     </div>
 </body>

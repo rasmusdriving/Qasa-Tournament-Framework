@@ -154,14 +154,20 @@ def get_odds(tournament_id: int, db: Session = Depends(get_db)):
             odds[team.name] = 0
     return odds
 
-@app.get("/", response_class=HTMLResponse)
+@app.get("/")
 async def index(request: Request, db: Session = Depends(get_db)):
     active_tournament = db.query(Tournament).filter(Tournament.is_active == True).first()
     if active_tournament:
+<<<<<<< Updated upstream
         teams = db.query(Team).filter(Team.tournament_id == active_tournament.id).all()
         odds = get_odds(active_tournament.id, db)
         return templates.TemplateResponse("brackets/index.html", {"request": request, "tournament": active_tournament, "teams": teams, "odds": odds})
     return templates.TemplateResponse("brackets/index.html", {"request": request, "message": "No active tournament"})
+=======
+        return templates.TemplateResponse("brackets/index.html", {"request": request, "tournament": active_tournament})
+    else:
+        return templates.TemplateResponse("brackets/no_active_tournament.html", {"request": request})
+>>>>>>> Stashed changes
 
 @app.get("/place_bet/{team_id}", response_class=HTMLResponse)
 async def place_bet_form(request: Request, team_id: int, db: Session = Depends(get_db)):
@@ -512,6 +518,286 @@ async def toggle_ongoing_match(match_id: int, data: dict = Body(...), db: Sessio
     db.commit()
     return {"success": True}
 
+<<<<<<< Updated upstream
+=======
+@app.get("/admin/get_teams/{tournament_id}")
+async def get_teams(tournament_id: int, db: Session = Depends(get_db)):
+    teams = db.query(Team).filter(Team.tournament_id == tournament_id).all()
+    return [{"id": team.id, "name": team.name} for team in teams]
+
+@app.post("/admin/create_bracket/{tournament_id}")
+async def create_bracket(tournament_id: int, data: dict = Body(...), db: Session = Depends(get_db)):
+    try:
+        tournament = db.query(Tournament).filter(Tournament.id == tournament_id).first()
+        if not tournament:
+            raise HTTPException(status_code=404, detail="Tournament not found")
+        
+        # Delete existing rounds and matches
+        db.query(Match).filter(Match.round.has(tournament_id=tournament_id)).delete(synchronize_session=False)
+        db.query(Round).filter(Round.tournament_id == tournament_id).delete(synchronize_session=False)
+        
+        round_count = int(data['roundCount'])
+        matchups = data['matchups']
+        
+        for i in range(1, round_count + 1):
+            new_round = Round(tournament_id=tournament_id, round_number=i)
+            db.add(new_round)
+            db.flush()
+            
+            round_matchups = [m for m in matchups if int(m['round']) == i]
+            for match in round_matchups:
+                new_match = Match(
+                    round_id=new_round.id,
+                    team1_id=match.get('team1'),
+                    team2_id=match.get('team2'),
+                    position=int(match['match']),
+                    is_bye=match.get('is_bye', False),
+                    bye_description=match.get('bye_description')
+                )
+                db.add(new_match)
+        
+        db.commit()
+        return {"message": "Bracket created successfully"}
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Error creating bracket: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"An error occurred while creating the bracket: {str(e)}")
+
+@app.post("/admin/delete_team/{team_id}")
+async def delete_team(team_id: int, db: Session = Depends(get_db)):
+    team = db.query(Team).filter(Team.id == team_id).first()
+    if not team:
+        raise HTTPException(status_code=404, detail="Team not found")
+    
+    # Delete all players associated with the team
+    db.query(Player).filter(Player.team_id == team_id).delete()
+    
+    # Delete the team
+    db.delete(team)
+    db.commit()
+    return {"success": True}
+
+@app.get("/tournament/{tournament_id}/bracket")
+async def get_tournament_bracket(tournament_id: int, db: Session = Depends(get_db)):
+    tournament = db.query(Tournament).filter(Tournament.id == tournament_id).first()
+    if not tournament:
+        raise HTTPException(status_code=404, detail="Tournament not found")
+
+    rounds = db.query(Round).filter(Round.tournament_id == tournament_id).order_by(Round.round_number).all()  # Changed from Round.number to Round.round_number
+
+    if not rounds:
+        return {"message": "Bracket has not been created yet", "bracket": []}
+
+    teams = db.query(Team).filter(Team.tournament_id == tournament_id).all()
+    
+    bracket_data = []
+    for round in rounds:
+        matches = db.query(Match).filter(Match.round_id == round.id).order_by(Match.position).all()
+        round_data = {
+            "round_number": round.round_number,
+            "matches": [
+                {
+                    "id": match.id,
+                    "team1": match.team1.name if match.team1 else "TBD",
+                    "team2": match.team2.name if match.team2 else "TBD",
+                    "team1_id": match.team1.id if match.team1 else None,
+                    "team2_id": match.team2.id if match.team2 else None,
+                    "team1_score": match.team1_score if match.team1_score is not None else "",
+                    "team2_score": match.team2_score if match.team2_score is not None else "",
+                    "winner": match.winner.name if match.winner else None,
+                    "winner_id": match.winner.id if match.winner else None,
+                    "position": match.position,
+                    "is_ongoing": match.is_ongoing,
+                    "is_bye": match.is_bye,  # Add this line
+                    "bye_description": match.bye_description  # Add this line
+                }
+                for match in matches
+            ]
+        }
+        bracket_data.append(round_data)
+
+    return {
+        "bracket": bracket_data,
+        "teams": [{"id": team.id, "name": team.name} for team in teams]
+    }
+
+@app.post("/admin/remove_bracket/{tournament_id}")
+async def remove_bracket(tournament_id: int, db: Session = Depends(get_db)):
+    try:
+        tournament = db.query(Tournament).filter(Tournament.id == tournament_id).first()
+        if not tournament:
+            raise HTTPException(status_code=404, detail="Tournament not found")
+        
+        # Delete all matches associated with the tournament
+        db.query(Match).filter(Match.round.has(tournament_id=tournament_id)).delete(synchronize_session=False)
+        
+        # Delete all rounds associated with the tournament
+        db.query(Round).filter(Round.tournament_id == tournament_id).delete(synchronize_session=False)
+        
+        db.commit()
+        return {"success": True, "message": "Bracket removed successfully"}
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Error removing bracket: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"An error occurred while removing the bracket: {str(e)}")
+
+@app.post("/admin/update_match/{match_id}")
+async def update_match(
+    match_id: int,
+    winner_name: Optional[str] = Body(None),
+    team1_score: Optional[int] = Body(None),
+    team2_score: Optional[int] = Body(None),
+    is_ongoing: Optional[bool] = Body(None),
+    team1_id: Optional[int] = Body(None),
+    team2_id: Optional[int] = Body(None),
+    db: Session = Depends(get_db)
+):
+    match = db.query(Match).filter(Match.id == match_id).first()
+    if not match:
+        raise HTTPException(status_code=404, detail="Match not found")
+    
+    if team1_id is not None:
+        match.team1_id = team1_id
+    if team2_id is not None:
+        match.team2_id = team2_id
+    if team1_score is not None:
+        match.team1_score = team1_score
+    if team2_score is not None:
+        match.team2_score = team2_score
+    
+    if winner_name:
+        winner = db.query(Team).filter((Team.id == match.team1_id) | (Team.id == match.team2_id), Team.name == winner_name).first()
+        if winner:
+            match.winner_id = winner.id
+            match.status = MatchStatus.COMPLETED
+    elif winner_name == "":
+        match.winner_id = None
+        match.status = MatchStatus.PENDING
+    
+    if is_ongoing is not None:
+        match.is_ongoing = is_ongoing
+    
+    db.commit()
+    db.refresh(match)
+    return {
+        "success": True,
+        "match": {
+            "id": match.id,
+            "team1_id": match.team1_id,
+            "team2_id": match.team2_id,
+            "team1_score": match.team1_score,
+            "team2_score": match.team2_score,
+            "winner": match.winner.name if match.winner else None,
+            "is_ongoing": match.is_ongoing
+        }
+    }
+
+@app.get("/admin/get_match/{match_id}")
+async def get_match(match_id: int, db: Session = Depends(get_db)):
+    match = db.query(Match).filter(Match.id == match_id).first()
+    if not match:
+        raise HTTPException(status_code=404, detail="Match not found")
+    return {
+        "id": match.id,
+        "team1_score": match.team1_score,
+        "team2_score": match.team2_score,
+        "winner_id": match.winner_id,
+        "is_ongoing": match.is_ongoing,
+        "status": match.status
+    }
+
+@app.get("/betting/{tournament_id}", response_class=HTMLResponse)
+async def betting_page(request: Request, tournament_id: int, db: Session = Depends(get_db)):
+    tournament = db.query(Tournament).filter(Tournament.id == tournament_id).first()
+    if not tournament:
+        raise HTTPException(status_code=404, detail="Tournament not found")
+    
+    betting_pool = calculate_betting_pool_and_odds(tournament_id, db)
+    odds = get_odds(tournament_id, db)
+    
+    return templates.TemplateResponse("brackets/betting.html", {
+        "request": request,
+        "tournament": tournament,
+        "betting_pool": betting_pool,
+        "odds": odds
+    })
+
+@app.get("/admin/bets/{tournament_id}")
+async def get_tournament_bets(tournament_id: int, db: Session = Depends(get_db)):
+    bets = db.query(Bet).filter(Bet.tournament_id == tournament_id).all()
+    return [{"id": bet.id, "name": bet.name, "amount": bet.amount, "team_id": bet.team_id, "status": bet.status} for bet in bets]
+
+@app.post("/admin/bets/{bet_id}/accept")
+async def accept_bet(bet_id: int, db: Session = Depends(get_db)):
+    bet = db.query(Bet).filter(Bet.id == bet_id).first()
+    if not bet:
+        raise HTTPException(status_code=404, detail="Bet not found")
+    bet.status = "accepted"
+    db.commit()
+    return {"success": True}
+
+@app.post("/admin/bets/{bet_id}/decline")
+async def decline_bet(bet_id: int, db: Session = Depends(get_db)):
+    bet = db.query(Bet).filter(Bet.id == bet_id).first()
+    if not bet:
+        raise HTTPException(status_code=404, detail="Bet not found")
+    bet.status = "declined"
+    db.commit()
+    return {"success": True}
+
+@app.delete("/admin/bets/{bet_id}")
+async def delete_bet(bet_id: int, db: Session = Depends(get_db)):
+    bet = db.query(Bet).filter(Bet.id == bet_id).first()
+    if not bet:
+        raise HTTPException(status_code=404, detail="Bet not found")
+    db.delete(bet)
+    db.commit()
+    return {"success": True}
+
+@app.post("/admin/delete_tournament/{tournament_id}")
+async def delete_tournament(tournament_id: int, db: Session = Depends(get_db)):
+    try:
+        tournament = db.query(Tournament).filter(Tournament.id == tournament_id).first()
+        if not tournament:
+            raise HTTPException(status_code=404, detail="Tournament not found")
+        
+        logger.info(f"Deleting tournament with ID: {tournament_id}")
+        
+        # Delete all matches associated with the tournament
+        matches_deleted = db.query(Match).filter(Match.round.has(tournament_id=tournament_id)).delete(synchronize_session=False)
+        logger.info(f"Deleted {matches_deleted} matches")
+        
+        # Delete all rounds associated with the tournament
+        rounds_deleted = db.query(Round).filter(Round.tournament_id == tournament_id).delete(synchronize_session=False)
+        logger.info(f"Deleted {rounds_deleted} rounds")
+        
+        # Delete all bets associated with the tournament
+        bets_deleted = db.query(Bet).filter(Bet.tournament_id == tournament_id).delete(synchronize_session=False)
+        logger.info(f"Deleted {bets_deleted} bets")
+        
+        # Delete all players associated with teams in the tournament
+        players_deleted = db.query(Player).filter(Player.team.has(tournament_id=tournament_id)).delete(synchronize_session=False)
+        logger.info(f"Deleted {players_deleted} players")
+        
+        # Delete all teams associated with the tournament
+        teams_deleted = db.query(Team).filter(Team.tournament_id == tournament_id).delete(synchronize_session=False)
+        logger.info(f"Deleted {teams_deleted} teams")
+        
+        # Delete the tournament
+        db.delete(tournament)
+        logger.info(f"Deleted tournament")
+        
+        db.commit()
+        logger.info(f"Successfully deleted tournament with ID: {tournament_id}")
+        
+        return {"success": True, "message": "Tournament deleted successfully"}
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Error deleting tournament: {str(e)}")
+        logger.exception("Full traceback:")
+        raise HTTPException(status_code=500, detail=f"An error occurred while deleting the tournament: {str(e)}")
+
+>>>>>>> Stashed changes
 if __name__ == "__main__":
     import uvicorn
     port = int(os.getenv("PORT", 8000))

@@ -53,7 +53,8 @@ class Round(Base):
     __tablename__ = "rounds"
     id = Column(Integer, primary_key=True, index=True)
     tournament_id = Column(Integer, ForeignKey("tournaments.id"))
-    number = Column(Integer)
+    round_number = Column(Integer)  # Change this line
+    name = Column(String, default="")
     tournament = relationship("Tournament", back_populates="rounds")
     matches = relationship("Match", back_populates="round")
 
@@ -72,6 +73,8 @@ class Match(Base):
     winner_id = Column(Integer, ForeignKey("teams.id"), nullable=True)
     status = Column(Enum(MatchStatus), default=MatchStatus.PENDING)
     position = Column(Integer)
+    is_bye = Column(Boolean, default=False)  # Add this line
+    bye_description = Column(String, nullable=True)  # Add this line
     round = relationship("Round", back_populates="matches")
     team1 = relationship("Team", foreign_keys=[team1_id])
     team2 = relationship("Team", foreign_keys=[team2_id])
