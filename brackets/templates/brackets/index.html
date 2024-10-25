@@ -18,14 +18,12 @@
         .bracket-container {
             display: grid;
             grid-template-columns: repeat(4, 1fr);
-            /* Adjust the number of columns as needed */
-            gap: 2rem;
+            gap: 4rem;
+            /* Increase gap to space out the rounds */
             padding: 0.5rem;
             height: auto;
-            /* Allow height to adjust based on content */
             justify-items: center;
             align-items: start;
-            /* Align items to the top */
         }
 
         .round-column {
@@ -57,15 +55,16 @@
         .match-card {
             display: flex;
             flex-direction: row;
-            /* Align teams horizontally */
             justify-content: space-between;
-            width: 300px;
-            /* Adjust width as needed */
+            width: auto;
+            /* Allow width to adjust */
             background: linear-gradient(135deg, #16213e 0%, #1a1a2e 100%);
             border-radius: 0.25rem;
             padding: 0.5rem;
             box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
             margin: 0.25rem 0;
+            align-items: center;
+            /* Center content vertically */
         }
 
         .match-card.finals {
@@ -78,7 +77,6 @@
             display: flex;
             flex-direction: column;
             align-items: center;
-            /* Center team name and score */
             padding: 0.1rem;
             margin: 0.1rem;
             border-radius: 0.1rem;
@@ -86,14 +84,14 @@
         }
 
         .team-name {
-            font-size: 0.8rem;
-            font-weight: 600;
-            margin-bottom: 0.2rem;
+            display: none;
+            /* Hide team names */
         }
 
         .player-cards {
             display: flex;
-            gap: 0.1rem;
+            gap: 0.5rem;
+            /* Adjust gap between player cards */
         }
 
         .team-score {
@@ -104,9 +102,9 @@
         }
 
         .player-card {
-            width: 40px;
+            width: 80px;
             /* Increase size */
-            height: 40px;
+            height: 80px;
             /* Increase size */
         }
 
@@ -122,6 +120,16 @@
         .bye-match {
             margin: 0.5rem 0;
             background: rgba(22, 33, 62, 0.8);
+        }
+
+        .vs-text {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.2rem;
+            font-weight: bold;
+            color: #e6e6e6;
+            margin: 0 10px;
         }
     </style>
 </head>
@@ -155,11 +163,12 @@
                     .then(response => response.json())
                     .then(data => {
                         data.rounds.forEach((round, roundIndex) => {
+                            const isFinalRound = roundIndex === data.rounds.length - 1;
                             const roundColumn = $(`
                                 <div class="round-column">
                                     <h3 class="text-xl font-bold mb-4">${round.name || `Round ${round.round_number}`}</h3>
                                     <div class="matches-container">
-                                        ${renderNormalMatches(round.matches.filter(m => !m.is_bye))}
+                                        ${renderNormalMatches(round.matches.filter(m => !m.is_bye), isFinalRound)}
                                     </div>
                                     ${renderByeMatchesSection(round.matches.filter(m => m.is_bye), round.round_number)}
                                 </div>
@@ -169,10 +178,10 @@
                     });
             }
 
-            function renderNormalMatches(matches) {
+            function renderNormalMatches(matches, isFinalRound) {
                 return matches.map(match => `
                     <div class="match-card">
-                        ${renderMatch(match)}
+                        ${renderMatch(match, isFinalRound)}
                     </div>
                 `).join('');
             }
@@ -192,13 +201,14 @@
                 `;
             }
 
-            function renderMatch(match) {
+            function renderMatch(match, isFinalRound = false) {
                 if (!match) return '';
 
                 return `
                     <div class="match-card">
-                        ${renderTeam(match.team1, match.team1_score, match.winner_id === match.team1?.id)}
-                        ${renderTeam(match.team2, match.team2_score, match.winner_id === match.team2?.id)}
+                        ${renderTeam(match.team1, match.team1_score, match.winner_id === match.team1?.id, isFinalRound)}
+                        <div class="vs-text">vs</div>
+                        ${renderTeam(match.team2, match.team2_score, match.winner_id === match.team2?.id, isFinalRound)}
                     </div>
                 `;
             }
@@ -221,14 +231,16 @@
                 `;
             }
 
-            function renderTeam(team, score, isWinner) {
+            function renderTeam(team, score, isWinner, isFinalRound = false) {
+                const placeholderImage = isFinalRound ? 'finally_placeholder.png' : 'TBD.png';
+
                 if (!team) {
                     return `
                         <div class="team-container tbd-placeholder">
                             <div class="team-name">TBD</div>
                             <div class="player-cards">
                                 <div class="player-card">
-                                    <img src="/static/player_images/TBD.png" alt="TBD">
+                                    <img src="/static/player_images/${placeholderImage}" alt="TBD">
                                 </div>
                             </div>
                             <div class="team-score">0</div>

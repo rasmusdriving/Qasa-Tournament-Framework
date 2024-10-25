@@ -85,11 +85,20 @@ class BetResponse(BetCreate):
 
 # Dependency
 def get_db():
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
+    retries = 3
+    while retries > 0:
+        try:
+            db = SessionLocal()
+            yield db
+        except OperationalError as e:
+            retries -= 1
+            if retries == 0:
+                logger.error(f"Failed to connect to database after 3 attempts: {str(e)}")
+                raise
+            logger.warning(f"Database connection failed, retrying... ({retries} attempts left)")
+            time.sleep(1)
+        finally:
+            db.close()
 
 app = FastAPI()
 
