@@ -19,11 +19,12 @@
             display: grid;
             grid-template-columns: repeat(4, 1fr);
             gap: 4rem;
-            /* Increase gap to space out the rounds */
             padding: 0.5rem;
             height: auto;
-            justify-items: center;
+            justify-items: start;
             align-items: start;
+            margin-left: 0.5rem;
+            min-width: max-content;
         }
 
         .round-column {
@@ -31,9 +32,9 @@
             flex-direction: column;
             align-items: center;
             justify-content: center;
-            /* Center items vertically */
             height: 100%;
             padding-top: 0.5rem;
+            min-width: fit-content;
         }
 
         .round-column h3 {
@@ -78,8 +79,20 @@
             margin: 0.1rem;
             border-radius: 0.25rem;
             background: rgba(255, 255, 255, 0.05);
-            min-width: 180px;
-            /* Add minimum width */
+            min-width: 250px;
+            border: 2px solid transparent;
+            /* Add transparent border by default */
+            transition: all 0.3s ease;
+            /* Smooth transition for effects */
+        }
+
+        .team-container.winner {
+            border-color: #4CAF50;
+            /* Green border for winner */
+            box-shadow: 0 0 15px rgba(76, 175, 80, 0.3);
+            /* Subtle green glow */
+            background: rgba(76, 175, 80, 0.05);
+            /* Slight green tint */
         }
 
         .team-name {
@@ -89,26 +102,26 @@
 
         .player-cards {
             display: flex;
+            flex-direction: row;
             gap: 0.5rem;
             margin-bottom: 0.5rem;
-            flex-wrap: wrap;
-            /* Allow cards to wrap if needed */
             justify-content: center;
+            align-items: center;
         }
 
         .player-card {
-            width: 80px;
-            height: 80px;
+            width: 120px;
+            height: 160px;
             flex-shrink: 0;
-            /* Prevent shrinking */
             position: relative;
-            /* Add this */
+            margin: 0;
+            padding: 0;
         }
 
         .player-card img {
             width: 100%;
             height: 100%;
-            object-fit: cover;
+            object-fit: contain;
             border-radius: 0.25rem;
         }
 
@@ -123,6 +136,13 @@
             border-radius: 0.25rem;
             width: 100%;
             text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.5);
+        }
+
+        .team-score.winner {
+            background: rgba(76, 175, 80, 0.2);
+            /* Green tint for winner's score */
+            color: #66BB6A;
+            /* Brighter green for winner's score */
         }
 
         .round-bye-matches {
@@ -261,7 +281,7 @@
                                 </div>
                             `}
                         </div>
-                        <div class="team-score">${score !== undefined ? score : '0'}</div>
+                        <div class="team-score ${isWinner ? 'winner' : ''}">${score !== undefined ? score : '0'}</div>
                     </div>
                 `;
             }

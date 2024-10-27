@@ -88,6 +88,9 @@ def get_db():
     db = SessionLocal()
     try:
         yield db
+    except OperationalError:
+        db.rollback()  # Rollback any failed transaction
+        raise
     finally:
         db.close()
 
