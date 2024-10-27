@@ -176,7 +176,7 @@
                     <h4 class="text-lg font-semibold mb-2">Bracket</h4>
                     <div id="admin-bracket-{{ tournament.id }}" class="overflow-x-auto">
                         {% for round in tournament.rounds %}
-                        <div class="round mb-4">
+                        <div class="round mb-4" data-round-id="{{ round.id }}">
                             <div class="flex items-center mb-2">
                                 <button onclick="toggleRound('{{ round.id }}')" class="mr-2 text-gray-700">
                                     <span id="round-toggle-{{ round.id }}"
@@ -674,19 +674,20 @@
             })
                 .then(response => response.json())
                 .then(data => {
-                    if (!data.success) {
-                        throw new Error(data.detail || 'Failed to update team');
-                    }
-                    // Reload the match display to show updated teams and winner options
-                    const match = document.querySelector(`[data-match-id="${matchId}"]`);
-                    if (match) {
-                        const roundId = match.closest('.round').dataset.roundId;
+                    if (data.success) {
+                        // Get the round ID from the match's container
+                        const matchElement = document.querySelector(`[data-match-id="${matchId}"]`);
+                        const roundId = matchElement.closest('.round').getAttribute('data-round-id');
+
+                        // Reload the matches for this round
                         loadRoundMatches(roundId);
+                    } else {
+                        throw new Error(data.detail || 'Failed to update match team');
                     }
                 })
                 .catch(error => {
-                    console.error('Error updating team:', error);
-                    alert('Error updating team. Please try again.');
+                    console.error('Error updating match team:', error);
+                    alert('Error updating match team. Please try again.');
                 });
         }
 
@@ -976,6 +977,57 @@
                 .catch(error => {
                     console.error('Error adding match:', error);
                     alert('Error adding match. Please try again.');
+                });
+        }
+
+        // Add this function with the other JavaScript functions
+        function deleteTournament(tournamentId) {
+            if (!confirm('Are you sure you want to delete this tournament? This will remove all matches, teams, players, and bets.')) {
+                return;
+            }
+
+            fetch(`/admin/delete_tournament/${tournamentId}`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                }
+            })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        window.location.reload();
+                    } else {
+                        throw new Error(data.detail || 'Failed to delete tournament');
+                    }
+                })
+                .catch(error => {
+                    console.error('Error deleting tournament:', error);
+                    alert('Error deleting tournament. Please try again.');
+                });
+        }
+
+        function archiveTournament(tournamentId) {
+            if (!confirm('Are you sure you want to archive this tournament?')) {
+                return;
+            }
+
+            fetch(`/admin/archive_tournament/${tournamentId}`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                }
+            })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        window.location.reload();
+                    } else {
+                        throw new Error(data.detail || 'Failed to archive tournament');
+                    }
+                })
+                .catch(error => {
+                    console.error('Error archiving tournament:', error);
+                    alert('Error archiving tournament. Please try again.');
                 });
         }
     </script>

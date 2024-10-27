@@ -29,7 +29,11 @@ class Team(Base):
     tournament_id = Column(Integer, ForeignKey("tournaments.id"))
     tournament = relationship("Tournament", back_populates="teams")
     players = relationship("Player", back_populates="team")
-    bets = relationship("Bet", back_populates="team")  # Add this line
+    bets = relationship("Bet", back_populates="team")
+    # Add these relationships
+    matches_as_team1 = relationship("Match", foreign_keys="Match.team1_id", back_populates="team1")
+    matches_as_team2 = relationship("Match", foreign_keys="Match.team2_id", back_populates="team2")
+    matches_as_winner = relationship("Match", foreign_keys="Match.winner_id", back_populates="winner")
 
 class Player(Base):
     __tablename__ = "players"
@@ -76,9 +80,14 @@ class Match(Base):
     is_bye = Column(Boolean, default=False)
     bye_description = Column(String, nullable=True)
     round = relationship("Round", back_populates="matches")
-    team1 = relationship("Team", foreign_keys=[team1_id])
-    team2 = relationship("Team", foreign_keys=[team2_id])
-    winner = relationship("Team", foreign_keys=[winner_id])
+    team1 = relationship("Team", foreign_keys=[team1_id], back_populates="matches_as_team1")
+    team2 = relationship("Team", foreign_keys=[team2_id], back_populates="matches_as_team2")
+    winner = relationship("Team", foreign_keys=[winner_id], back_populates="matches_as_winner")
     is_ongoing = Column(Boolean, default=False, nullable=False)
     is_third_place = Column(Boolean, default=False)  # Add this line instead of title
     order = Column(Integer, nullable=False, default=0)
+    
+    # Keep only one set of these relationships
+    team1 = relationship("Team", foreign_keys=[team1_id], back_populates="matches_as_team1")
+    team2 = relationship("Team", foreign_keys=[team2_id], back_populates="matches_as_team2")
+    winner = relationship("Team", foreign_keys=[winner_id], back_populates="matches_as_winner")

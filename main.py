@@ -85,20 +85,11 @@ class BetResponse(BetCreate):
 
 # Dependency
 def get_db():
-    retries = 3
-    while retries > 0:
-        try:
-            db = SessionLocal()
-            yield db
-        except OperationalError as e:
-            retries -= 1
-            if retries == 0:
-                logger.error(f"Failed to connect to database after 3 attempts: {str(e)}")
-                raise
-            logger.warning(f"Database connection failed, retrying... ({retries} attempts left)")
-            time.sleep(1)
-        finally:
-            db.close()
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
 
 app = FastAPI()
 
@@ -430,12 +421,50 @@ async def get_tournament_bracket(tournament_id: int, db: Session = Depends(get_d
 
 @app.post("/admin/delete_tournament/{tournament_id}")
 async def delete_tournament(tournament_id: int, db: Session = Depends(get_db)):
-    tournament = db.query(Tournament).filter(Tournament.id == tournament_id).first()
-    if not tournament:
-        raise HTTPException(status_code=404, detail="Tournament not found")
-    db.delete(tournament)
-    db.commit()
-    return {"message": "Tournament deleted successfully"}
+    try:
+        tournament = db.query(Tournament).filter(Tournament.id == tournament_id).first()
+        if not tournament:
+            raise HTTPException(status_code=404, detail="Tournament not found")
+        
+        logger.info(f"Deleting tournament with ID: {tournament_id}")
+        
+        # Delete all matches associated with the tournament
+        matches_deleted = db.query(Match).filter(Match.round.has(tournament_id=tournament_id)).delete(synchronize_session=False)
+        logger.info(f"Deleted {matches_deleted} matches")
+        
+        # Delete all rounds associated with the tournament
+        rounds_deleted = db.query(Round).filter(Round.tournament_id == tournament_id).delete(synchronize_session=False)
+        logger.info(f"Deleted {rounds_deleted} rounds")
+        
+        # Delete all bets associated with the tournament
+        bets_deleted = db.query(Bet).filter(Bet.tournament_id == tournament_id).delete(synchronize_session=False)
+        logger.info(f"Deleted {bets_deleted} bets")
+        
+        # Delete all players associated with teams in the tournament
+        players_deleted = db.query(Player).filter(Player.team.has(tournament_id=tournament_id)).delete(synchronize_session=False)
+        logger.info(f"Deleted {players_deleted} players")
+        
+        # Delete all teams associated with the tournament
+        teams_deleted = db.query(Team).filter(Team.tournament_id == tournament_id).delete(synchronize_session=False)
+        logger.info(f"Deleted {teams_deleted} teams")
+        
+        # Delete the tournament
+        db.delete(tournament)
+        logger.info(f"Deleted tournament")
+        
+        # Commit all changes
+        db.commit()
+        logger.info(f"Successfully deleted tournament with ID: {tournament_id}")
+        
+        return {"success": True, "message": "Tournament deleted successfully"}
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Error deleting tournament: {str(e)}")
+        logger.exception("Full traceback:")
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        # Ensure the session is closed
+        db.close()
 
 @app.post("/admin/archive_tournament/{tournament_id}")
 async def archive_tournament(tournament_id: int, db: Session = Depends(get_db)):
@@ -643,45 +672,62 @@ async def update_match(
     team2_id: Optional[int] = Body(None),
     db: Session = Depends(get_db)
 ):
-    match = db.query(Match).filter(Match.id == match_id).first()
-    if not match:
-        raise HTTPException(status_code=404, detail="Match not found")
-    
-    if team1_id is not None:
-        match.team1_id = team1_id
-    if team2_id is not None:
-        match.team2_id = team2_id
-    if team1_score is not None:
-        match.team1_score = team1_score
-    if team2_score is not None:
-        match.team2_score = team2_score
-    
-    if winner_name:
-        winner = db.query(Team).filter((Team.id == match.team1_id) | (Team.id == match.team2_id), Team.name == winner_name).first()
-        if winner:
-            match.winner_id = winner.id
-            match.status = MatchStatus.COMPLETED
-    elif winner_name == "":
-        match.winner_id = None
-        match.status = MatchStatus.PENDING
-    
-    if is_ongoing is not None:
-        match.is_ongoing = is_ongoing
-    
-    db.commit()
-    db.refresh(match)
-    return {
-        "success": True,
-        "match": {
-            "id": match.id,
-            "team1_id": match.team1_id,
-            "team2_id": match.team2_id,
-            "team1_score": match.team1_score,
-            "team2_score": match.team2_score,
-            "winner": match.winner.name if match.winner else None,
-            "is_ongoing": match.is_ongoing
+    try:
+        match = db.query(Match).filter(Match.id == match_id).first()
+        if not match:
+            raise HTTPException(status_code=404, detail="Match not found")
+        
+        # Store original order
+        original_order = match.order
+        
+        # Update fields if provided
+        if team1_id is not None:
+            match.team1_id = team1_id
+        if team2_id is not None:
+            match.team2_id = team2_id
+        if team1_score is not None:
+            match.team1_score = team1_score
+        if team2_score is not None:
+            match.team2_score = team2_score
+        
+        if winner_name:
+            winner = db.query(Team).filter(
+                (Team.id == match.team1_id) | (Team.id == match.team2_id), 
+                Team.name == winner_name
+            ).first()
+            if winner:
+                match.winner_id = winner.id
+                match.status = MatchStatus.COMPLETED
+        elif winner_name == "":
+            match.winner_id = None
+            match.status = MatchStatus.PENDING
+        
+        if is_ongoing is not None:
+            match.is_ongoing = is_ongoing
+            
+        # Ensure order remains unchanged
+        match.order = original_order
+        
+        db.commit()
+        db.refresh(match)
+        
+        return {
+            "success": True,
+            "match": {
+                "id": match.id,
+                "team1_id": match.team1_id,
+                "team2_id": match.team2_id,
+                "team1_score": match.team1_score,
+                "team2_score": match.team2_score,
+                "winner": match.winner.name if match.winner else None,
+                "is_ongoing": match.is_ongoing,
+                "order": match.order  # Include order in response
+            }
         }
-    }
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Error updating match: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/admin/get_match/{match_id}")
 async def get_match(match_id: int, db: Session = Depends(get_db)):
@@ -745,49 +791,6 @@ async def delete_bet(bet_id: int, db: Session = Depends(get_db)):
     db.commit()
     return {"success": True}
 
-@app.post("/admin/delete_tournament/{tournament_id}")
-async def delete_tournament(tournament_id: int, db: Session = Depends(get_db)):
-    try:
-        tournament = db.query(Tournament).filter(Tournament.id == tournament_id).first()
-        if not tournament:
-            raise HTTPException(status_code=404, detail="Tournament not found")
-        
-        logger.info(f"Deleting tournament with ID: {tournament_id}")
-        
-        # Delete all matches associated with the tournament
-        matches_deleted = db.query(Match).filter(Match.round.has(tournament_id=tournament_id)).delete(synchronize_session=False)
-        logger.info(f"Deleted {matches_deleted} matches")
-        
-        # Delete all rounds associated with the tournament
-        rounds_deleted = db.query(Round).filter(Round.tournament_id == tournament_id).delete(synchronize_session=False)
-        logger.info(f"Deleted {rounds_deleted} rounds")
-        
-        # Delete all bets associated with the tournament
-        bets_deleted = db.query(Bet).filter(Bet.tournament_id == tournament_id).delete(synchronize_session=False)
-        logger.info(f"Deleted {bets_deleted} bets")
-        
-        # Delete all players associated with teams in the tournament
-        players_deleted = db.query(Player).filter(Player.team.has(tournament_id=tournament_id)).delete(synchronize_session=False)
-        logger.info(f"Deleted {players_deleted} players")
-        
-        # Delete all teams associated with the tournament
-        teams_deleted = db.query(Team).filter(Team.tournament_id == tournament_id).delete(synchronize_session=False)
-        logger.info(f"Deleted {teams_deleted} teams")
-        
-        # Delete the tournament
-        db.delete(tournament)
-        logger.info(f"Deleted tournament")
-        
-        db.commit()
-        logger.info(f"Successfully deleted tournament with ID: {tournament_id}")
-        
-        return {"success": True, "message": "Tournament deleted successfully"}
-    except Exception as e:
-        db.rollback()
-        logger.error(f"Error deleting tournament: {str(e)}")
-        logger.exception("Full traceback:")
-        raise HTTPException(status_code=500, detail=f"An error occurred while deleting the tournament: {str(e)}")
-
 @app.post("/admin/update_round_name/{round_id}")
 async def update_round_name(round_id: int, name: str = Body(..., embed=True), db: Session = Depends(get_db)):
     try:
@@ -850,61 +853,118 @@ async def get_tournament_teams(tournament_id: int, db: Session = Depends(get_db)
 @app.get("/admin/round/{round_id}/matches")
 async def get_round_matches(round_id: int, db: Session = Depends(get_db)):
     try:
+        # Get matches with explicit ordering
+        matches = db.query(Match).filter(
+            Match.round_id == round_id
+        ).options(
+            joinedload(Match.team1),
+            joinedload(Match.team2),
+            joinedload(Match.winner)
+        ).order_by(Match.order.asc()).all()
+        
+        # Get the round to check if it's the final round
         round = db.query(Round).filter(Round.id == round_id).first()
         if not round:
             raise HTTPException(status_code=404, detail="Round not found")
         
-        # Add order by Match.order to maintain consistent ordering
-        matches = db.query(Match).filter(Match.round_id == round_id).order_by(Match.order).all()
+        tournament = db.query(Tournament).filter(Tournament.id == round.tournament_id).first()
+        if not tournament:
+            raise HTTPException(status_code=404, detail="Tournament not found")
         
-        tournament_teams = db.query(Team).filter(Team.tournament_id == round.tournament_id).all()
-        available_teams = [{"id": team.id, "name": team.name} for team in tournament_teams]
+        # Get all teams for the tournament
+        available_teams = db.query(Team).filter(Team.tournament_id == tournament.id).all()
         
-        # Get total number of rounds to identify if this is the final round
-        total_rounds = db.query(Round).filter(Round.tournament_id == round.tournament_id).count()
-        is_final_round = round.round_number == total_rounds
+        # Check if this is the final round
+        is_final_round = round.round_number == len(tournament.rounds)
         
         match_data = []
         for match in matches:
-            team1 = db.query(Team).filter(Team.id == match.team1_id).first() if match.team1_id else None
-            team2 = db.query(Team).filter(Team.id == match.team2_id).first() if match.team2_id else None
-            
             match_data.append({
                 "id": match.id,
-                "team1_id": match.team1_id,
-                "team2_id": match.team2_id,
-                "team1_name": team1.name if team1 else None,
-                "team2_name": team2.name if team2 else None,
-                "team1_score": match.team1_score,
-                "team2_score": match.team2_score,
+                "team1": {"id": match.team1.id, "name": match.team1.name} if match.team1 else None,
+                "team2": {"id": match.team2.id, "name": match.team2.name} if match.team2 else None,
                 "winner_id": match.winner_id,
                 "is_bye": match.is_bye,
                 "bye_description": match.bye_description,
                 "is_third_place": match.is_third_place,
-                "available_teams": available_teams,
+                "available_teams": [{"id": team.id, "name": team.name} for team in available_teams],
                 "is_final_round": is_final_round,
-                "order": match.order  # Include order in the response
+                "order": match.order,
+                "team1_id": match.team1_id,  # Add these explicit IDs
+                "team2_id": match.team2_id   # Add these explicit IDs
             })
             
+        # Sort the matches by order before returning
+        match_data.sort(key=lambda x: x["order"])
         return match_data
+        
     except Exception as e:
         logger.error(f"Error getting round matches: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/admin/match/{match_id}/update")
-async def update_match(match_id: int, data: dict = Body(...), db: Session = Depends(get_db)):
+async def update_match(
+    match_id: int,
+    winner_name: Optional[str] = Body(None),
+    team1_score: Optional[int] = Body(None),
+    team2_score: Optional[int] = Body(None),
+    is_ongoing: Optional[bool] = Body(None),
+    team1_id: Optional[int] = Body(None),
+    team2_id: Optional[int] = Body(None),
+    db: Session = Depends(get_db)
+):
     try:
         match = db.query(Match).filter(Match.id == match_id).first()
         if not match:
             raise HTTPException(status_code=404, detail="Match not found")
         
-        # Update match fields
-        for key, value in data.items():
-            if hasattr(match, key):
-                setattr(match, key, value)
+        # Store original order
+        original_order = match.order
+        
+        # Update fields if provided
+        if team1_id is not None:
+            match.team1_id = team1_id
+        if team2_id is not None:
+            match.team2_id = team2_id
+        if team1_score is not None:
+            match.team1_score = team1_score
+        if team2_score is not None:
+            match.team2_score = team2_score
+        
+        if winner_name:
+            winner = db.query(Team).filter(
+                (Team.id == match.team1_id) | (Team.id == match.team2_id), 
+                Team.name == winner_name
+            ).first()
+            if winner:
+                match.winner_id = winner.id
+                match.status = MatchStatus.COMPLETED
+        elif winner_name == "":
+            match.winner_id = None
+            match.status = MatchStatus.PENDING
+        
+        if is_ongoing is not None:
+            match.is_ongoing = is_ongoing
+            
+        # Ensure order remains unchanged
+        match.order = original_order
         
         db.commit()
-        return {"success": True}
+        db.refresh(match)
+        
+        return {
+            "success": True,
+            "match": {
+                "id": match.id,
+                "team1_id": match.team1_id,
+                "team2_id": match.team2_id,
+                "team1_score": match.team1_score,
+                "team2_score": match.team2_score,
+                "winner": match.winner.name if match.winner else None,
+                "is_ongoing": match.is_ongoing,
+                "order": match.order  # Include order in response
+            }
+        }
     except Exception as e:
         db.rollback()
         logger.error(f"Error updating match: {str(e)}")
