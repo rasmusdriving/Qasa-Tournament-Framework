@@ -1,23 +1,8 @@
 version: '3'
 
 services:
-  db:
-    image: postgres:13
-    environment:
-      - POSTGRES_USER=your_user
-      - POSTGRES_PASSWORD=your_password
-      - POSTGRES_DB=your_db
-    healthcheck:
-      test: [ "CMD-SHELL", "pg_isready -U your_user" ]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-
   web:
     build: .
-    depends_on:
-      db:
-        condition: service_healthy
     command: >
       sh -c "alembic upgrade head &&
              uvicorn main:app --host 0.0.0.0 --port ${PORT:-8000} --reload"
@@ -30,6 +15,4 @@ services:
       - .env
     environment:
       - PORT=${PORT:-8000}
-      - DATABASE_URL=postgresql://your_user:your_password@db:5432/your_db
-
-# Remove the db service since we're using an external database
+      - DATABASE_URL=postgresql://tournament_framework_tdxm_user:Ox4fJoKj9v0OL7G2xSMchHXx2PaA4VA6@dpg-csclf49u0jms73fduueg-a.frankfurt-postgres.render.com/tournament_framework_tdxm

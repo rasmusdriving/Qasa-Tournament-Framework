@@ -386,11 +386,10 @@
                 const team1Id = document.getElementById('team1Select').value;
                 const team2Id = document.getElementById('team2Select').value;
 
-                // Remove the validation check for team selection
                 matchData = {
                     ...matchData,
-                    team1_id: team1Id ? parseInt(team1Id) : null,
-                    team2_id: team2Id ? parseInt(team2Id) : null,
+                    team1_id: team1Id === "" ? null : parseInt(team1Id),  // Changed this line
+                    team2_id: team2Id === "" ? null : parseInt(team2Id),  // Changed this line
                     is_bye: false
                 };
             } else {
@@ -463,6 +462,18 @@
             fetch(`/admin/round/${roundId}/matches`)
                 .then(response => response.json())
                 .then(matches => {
+                    console.log('Received matches data:', matches);
+                    matches.forEach(match => {
+                        console.log(`Match ${match.id} team IDs:`, {
+                            team1_id: match.team1_id,
+                            team2_id: match.team2_id,
+                            team1_id_type: typeof match.team1_id,
+                            team2_id_type: typeof match.team2_id,
+                            is_team1_null: match.team1_id === null,
+                            is_team2_null: match.team2_id === null
+                        });
+                    });
+
                     const matchesContainer = document.getElementById(`matches-container-${roundId}`);
                     if (!matchesContainer) return;
 
@@ -500,7 +511,7 @@
                                         <div class="flex-1">
                                             <select class="p-1 border rounded w-64" 
                                                 onchange="updateMatchTeam(${match.id}, 'team1', this.value)">
-                                                <option value="">Select Team 1</option>
+                                                <option value="" ${match.team1_id === null ? 'selected' : ''}>Select Team 1</option>
                                                 ${match.available_teams?.map(team =>
                                 `<option value="${team.id}" ${team.id === match.team1_id ? 'selected' : ''}>
                                                 ${team.name}
@@ -516,7 +527,7 @@
                                         <div class="flex-1">
                                             <select class="p-1 border rounded w-64" 
                                                 onchange="updateMatchTeam(${match.id}, 'team2', this.value)">
-                                                <option value="">Select Team 2</option>
+                                                <option value="" ${match.team2_id === null ? 'selected' : ''}>Select Team 2</option>
                                                 ${match.available_teams?.map(team =>
                                 `<option value="${team.id}" ${team.id === match.team2_id ? 'selected' : ''}>
                                                 ${team.name}
@@ -537,12 +548,12 @@
                                             <option value="">Select Winner</option>
                                             ${match.team1_id ?
                                     `<option value="${match.team1_id}" ${match.winner_id === match.team1_id ? 'selected' : ''}>
-                                                    ${match.available_teams.find(t => t.id === match.team1_id)?.name || ''}
-                                                </option>` : ''}
+                                            ${match.available_teams.find(t => t.id === match.team1_id)?.name || ''}
+                                        </option>` : ''}
                                             ${match.team2_id ?
                                     `<option value="${match.team2_id}" ${match.winner_id === match.team2_id ? 'selected' : ''}>
-                                                    ${match.available_teams.find(t => t.id === match.team2_id)?.name || ''}
-                                                </option>` : ''}
+                                            ${match.available_teams.find(t => t.id === match.team2_id)?.name || ''}
+                                        </option>` : ''}
                                         </select>
                                     </div>
                                 </div>`;
@@ -560,7 +571,7 @@
             const data = {};
             data[`${team}_score`] = parseInt(score);
 
-            fetch(`/admin/match/${matchId}/update`, {
+            fetch(`/admin/update_match/${matchId}`, {  // Changed from /admin/match/${matchId}/update
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -669,24 +680,48 @@
 
         // Add these new functions
         function updateMatchTeam(matchId, teamField, teamId) {
-            const data = {};
-            data[`${teamField}_id`] = teamId ? parseInt(teamId) : null;
+            console.log('Updating match team:', { matchId, teamField, teamId, isEmptyString: teamId === "" });
 
-            fetch(`/admin/match/${matchId}/update`, {
+            const data = {};
+            data[`${teamField}_id`] = teamId === "" ? null : parseInt(teamId);
+
+            console.log('Request data:', data);
+
+            fetch(`/admin/update_match/${matchId}`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                 },
                 body: JSON.stringify(data)
             })
-                .then(response => response.json())
+                .then(async response => {
+                    console.log('Response status:', response.status);
+                    const responseData = await response.json();
+                    console.log('Raw response data:', responseData);
+
+                    if (!response.ok) {
+                        throw new Error(`Network response was not ok: ${JSON.stringify(responseData)}`);
+                    }
+                    return responseData;
+                })
                 .then(data => {
+                    console.log('Processed response data:', data);
                     if (data.success) {
                         // Get the round ID from the match's container
                         const matchElement = document.querySelector(`[data-match-id="${matchId}"]`);
-                        const roundId = matchElement.closest('.round').getAttribute('data-round-id');
+                        if (!matchElement) {
+                            throw new Error(`Could not find match element for ID ${matchId}`);
+                        }
+                        const roundElement = matchElement.closest('.round');
+                        if (!roundElement) {
+                            throw new Error(`Could not find round element for match ID ${matchId}`);
+                        }
+                        const roundId = roundElement.getAttribute('data-round-id');
+                        if (!roundId) {
+                            throw new Error(`Could not find round ID for match ID ${matchId}`);
+                        }
 
-                        // Reload the matches for this round
+                        // Only reload if the update was successful
                         loadRoundMatches(roundId);
                     } else {
                         throw new Error(data.detail || 'Failed to update match team');
@@ -945,7 +980,8 @@
             const roundId = currentRoundId;
             const matchType = document.getElementById('matchType').value;
             const data = {
-                is_third_place: currentIsThirdPlace || false,  // Use currentIsThirdPlace instead of isThirdPlace
+                round_id: roundId,
+                is_third_place: currentIsThirdPlace || false,
                 is_bye: matchType === 'bye'
             };
 
@@ -953,15 +989,21 @@
                 const byeTeamSelect = document.getElementById('byeTeamSelect');
                 const byeDescription = document.getElementById('byeDescription');
 
-                data.team1_id = byeTeamSelect.value ? parseInt(byeTeamSelect.value) : null;
+                if (!byeTeamSelect.value) {
+                    alert('Please select a team for the bye match');
+                    return;
+                }
+
+                data.team1_id = parseInt(byeTeamSelect.value);
                 data.team2_id = null;
                 data.bye_description = byeDescription.value;
             } else {
                 const team1Select = document.getElementById('team1Select');
                 const team2Select = document.getElementById('team2Select');
 
-                data.team1_id = team1Select.value ? parseInt(team1Select.value) : null;
-                data.team2_id = team2Select.value ? parseInt(team2Select.value) : null;
+                // Allow empty selections by explicitly checking for empty string
+                data.team1_id = team1Select.value === "" ? null : parseInt(team1Select.value);
+                data.team2_id = team2Select.value === "" ? null : parseInt(team2Select.value);
                 data.bye_description = null;
             }
 
@@ -1066,6 +1108,19 @@
                     console.error('Error updating match winner:', error);
                     alert('Error updating match winner. Please try again.');
                 });
+        }
+
+        // Add this new function before the existing JavaScript functions
+        function addPlayerInput(tournamentId) {
+            const container = document.getElementById(`player-inputs-${tournamentId}`);
+            const newInput = document.createElement('div');
+            newInput.className = 'mt-2';
+            newInput.innerHTML = `
+                <label class="block text-sm font-medium text-gray-700">Player Name</label>
+                <input type="text" name="player_names" required
+                    class="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500">
+            `;
+            container.appendChild(newInput);
         }
     </script>
 </body>
