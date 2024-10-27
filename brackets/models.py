@@ -87,7 +87,12 @@ class Match(Base):
     is_third_place = Column(Boolean, default=False)  # Add this line instead of title
     order = Column(Integer, nullable=False, default=0)
     
-    # Keep only one set of these relationships
+    # Keep only ONE set of these relationships (remove the duplicates below)
     team1 = relationship("Team", foreign_keys=[team1_id], back_populates="matches_as_team1")
     team2 = relationship("Team", foreign_keys=[team2_id], back_populates="matches_as_team2")
     winner = relationship("Team", foreign_keys=[winner_id], back_populates="matches_as_winner")
+    
+    # Remove these duplicate relationships
+    # team1 = relationship("Team", foreign_keys=[team1_id], back_populates="matches_as_team1")
+    # team2 = relationship("Team", foreign_keys=[team2_id], back_populates="matches_as_team2")
+    # winner = relationship("Team", foreign_keys=[winner_id], back_populates="matches_as_winner")

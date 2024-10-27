@@ -507,7 +507,7 @@
                                             </option>`
                             ).join('')}
                                             </select>
-                                            <input type="number" value="${match.team1_score || 0}" 
+                                            <input type="number" value="${match.team1_score !== null ? match.team1_score : 0}" 
                                                 class="w-16 p-1 border rounded ml-2"
                                                 onchange="updateMatchScore(${match.id}, 'team1', this.value)"
                                                 placeholder="Score">
@@ -523,7 +523,7 @@
                                             </option>`
                             ).join('')}
                                             </select>
-                                            <input type="number" value="${match.team2_score || 0}" 
+                                            <input type="number" value="${match.team2_score !== null ? match.team2_score : 0}" 
                                                 class="w-16 p-1 border rounded ml-2"
                                                 onchange="updateMatchScore(${match.id}, 'team2', this.value)"
                                                 placeholder="Score">
@@ -537,12 +537,12 @@
                                             <option value="">Select Winner</option>
                                             ${match.team1_id ?
                                     `<option value="${match.team1_id}" ${match.winner_id === match.team1_id ? 'selected' : ''}>
-                                            ${match.team1_name}
-                                        </option>` : ''}
+                                                    ${match.available_teams.find(t => t.id === match.team1_id)?.name || ''}
+                                                </option>` : ''}
                                             ${match.team2_id ?
                                     `<option value="${match.team2_id}" ${match.winner_id === match.team2_id ? 'selected' : ''}>
-                                            ${match.team2_name}
-                                        </option>` : ''}
+                                                    ${match.available_teams.find(t => t.id === match.team2_id)?.name || ''}
+                                                </option>` : ''}
                                         </select>
                                     </div>
                                 </div>`;
@@ -579,25 +579,32 @@
                 });
         }
 
-        function updateMatchWinner(matchId, winnerId) {
-            fetch(`/admin/match/${matchId}/update`, {
+        function updateMatchWinner(matchId, winnerTeamId) {
+            fetch(`/admin/update_match/${matchId}`, {  // Changed from /admin/match/${matchId}/update
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                 },
                 body: JSON.stringify({
-                    winner_id: winnerId ? parseInt(winnerId) : null
+                    winner_id: winnerTeamId ? parseInt(winnerTeamId) : null
                 })
             })
                 .then(response => response.json())
                 .then(data => {
-                    if (!data.success) {
-                        throw new Error(data.detail || 'Failed to update winner');
+                    if (data.success) {
+                        // Get the round ID from the match's container
+                        const matchElement = document.querySelector(`[data-match-id="${matchId}"]`);
+                        const roundId = matchElement.closest('.round').getAttribute('data-round-id');
+
+                        // Reload the matches for this round
+                        loadRoundMatches(roundId);
+                    } else {
+                        throw new Error(data.detail || 'Failed to update match winner');
                     }
                 })
                 .catch(error => {
-                    console.error('Error updating winner:', error);
-                    alert('Error updating winner. Please try again.');
+                    console.error('Error updating match winner:', error);
+                    alert('Error updating match winner. Please try again.');
                 });
         }
 
@@ -1028,6 +1035,36 @@
                 .catch(error => {
                     console.error('Error archiving tournament:', error);
                     alert('Error archiving tournament. Please try again.');
+                });
+        }
+
+        // Add this new function
+        function updateMatchWinner(matchId, winnerTeamId) {
+            fetch(`/admin/update_match/${matchId}`, {  // Changed from /admin/match/${matchId}/update
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    winner_id: winnerTeamId ? parseInt(winnerTeamId) : null
+                })
+            })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        // Get the round ID from the match's container
+                        const matchElement = document.querySelector(`[data-match-id="${matchId}"]`);
+                        const roundId = matchElement.closest('.round').getAttribute('data-round-id');
+
+                        // Reload the matches for this round
+                        loadRoundMatches(roundId);
+                    } else {
+                        throw new Error(data.detail || 'Failed to update match winner');
+                    }
+                })
+                .catch(error => {
+                    console.error('Error updating match winner:', error);
+                    alert('Error updating match winner. Please try again.');
                 });
         }
     </script>

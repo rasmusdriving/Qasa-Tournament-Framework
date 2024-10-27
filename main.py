@@ -336,41 +336,59 @@ async def generate_bracket(tournament_id: int, data: dict = Body(...), db: Sessi
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/admin/update_match/{match_id}")
-async def update_match(match_id: int, data: dict = Body(...), db: Session = Depends(get_db)):
-    match = db.query(Match).filter(Match.id == match_id).first()
-    if not match:
-        raise HTTPException(status_code=404, detail="Match not found")
-
-    if 'team1_score' in data:
-        match.team1_score = data['team1_score']
-    if 'team2_score' in data:
-        match.team2_score = data['team2_score']
-    
-    if 'winner_name' in data and data['winner_name']:
-        winner = db.query(Team).filter(Team.name == data['winner_name']).first()
-        if winner:
-            match.winner = winner
-            match.is_ongoing = False  # Remove ongoing status when a winner is selected
-
-            # Update the next round's match
-            next_round = db.query(Round).filter(Round.tournament_id == match.round.tournament_id, 
-                                                Round.number == match.round.number + 1).first()
-            if next_round:
-                next_match_position = match.position // 2
-                next_match = db.query(Match).filter(Match.round_id == next_round.id, 
-                                                    Match.position == next_match_position).first()
-                if next_match:
-                    if match.position % 2 == 0:
-                        next_match.team1 = winner
-                    else:
-                        next_match.team2 = winner
-        else:
-            raise HTTPException(status_code=400, detail="Winner team not found")
-    elif 'winner_name' in data and not data['winner_name']:
-        match.winner = None  # Clear the winner if an empty string is sent
-
-    db.commit()
-    return {"success": True, "message": "Match updated successfully"}
+async def update_match(
+    match_id: int,
+    winner_id: Optional[int] = Body(None),
+    team1_score: Optional[int] = Body(None),
+    team2_score: Optional[int] = Body(None),
+    is_ongoing: Optional[bool] = Body(None),
+    team1_id: Optional[int] = Body(None),
+    team2_id: Optional[int] = Body(None),
+    db: Session = Depends(get_db)
+):
+    try:
+        match = db.query(Match).filter(Match.id == match_id).first()
+        if not match:
+            raise HTTPException(status_code=404, detail="Match not found")
+        
+        # Update fields if provided
+        if team1_id is not None:
+            match.team1_id = team1_id
+        if team2_id is not None:
+            match.team2_id = team2_id
+        if team1_score is not None:
+            match.team1_score = team1_score
+        if team2_score is not None:
+            match.team2_score = team2_score
+        if winner_id is not None:
+            match.winner_id = winner_id
+            match.status = MatchStatus.COMPLETED
+        elif winner_id == None:  # Explicitly set to None (not just missing)
+            match.winner_id = None
+            match.status = MatchStatus.PENDING
+        if is_ongoing is not None:
+            match.is_ongoing = is_ongoing
+            
+        db.commit()
+        db.refresh(match)
+        
+        return {
+            "success": True,
+            "match": {
+                "id": match.id,
+                "team1_id": match.team1_id,
+                "team2_id": match.team2_id,
+                "team1_score": match.team1_score,
+                "team2_score": match.team2_score,
+                "winner_id": match.winner_id,
+                "is_ongoing": match.is_ongoing,
+                "status": match.status.value if match.status else None
+            }
+        }
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Error updating match: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/tournament/{tournament_id}/bracket")
 async def get_tournament_bracket(tournament_id: int, db: Session = Depends(get_db)):
@@ -661,88 +679,6 @@ async def remove_bracket(tournament_id: int, db: Session = Depends(get_db)):
         logger.error(f"Error removing bracket: {str(e)}")
         raise HTTPException(status_code=500, detail=f"An error occurred while removing the bracket: {str(e)}")
 
-@app.post("/admin/update_match/{match_id}")
-async def update_match(
-    match_id: int,
-    winner_name: Optional[str] = Body(None),
-    team1_score: Optional[int] = Body(None),
-    team2_score: Optional[int] = Body(None),
-    is_ongoing: Optional[bool] = Body(None),
-    team1_id: Optional[int] = Body(None),
-    team2_id: Optional[int] = Body(None),
-    db: Session = Depends(get_db)
-):
-    try:
-        match = db.query(Match).filter(Match.id == match_id).first()
-        if not match:
-            raise HTTPException(status_code=404, detail="Match not found")
-        
-        # Store original order
-        original_order = match.order
-        
-        # Update fields if provided
-        if team1_id is not None:
-            match.team1_id = team1_id
-        if team2_id is not None:
-            match.team2_id = team2_id
-        if team1_score is not None:
-            match.team1_score = team1_score
-        if team2_score is not None:
-            match.team2_score = team2_score
-        
-        if winner_name:
-            winner = db.query(Team).filter(
-                (Team.id == match.team1_id) | (Team.id == match.team2_id), 
-                Team.name == winner_name
-            ).first()
-            if winner:
-                match.winner_id = winner.id
-                match.status = MatchStatus.COMPLETED
-        elif winner_name == "":
-            match.winner_id = None
-            match.status = MatchStatus.PENDING
-        
-        if is_ongoing is not None:
-            match.is_ongoing = is_ongoing
-            
-        # Ensure order remains unchanged
-        match.order = original_order
-        
-        db.commit()
-        db.refresh(match)
-        
-        return {
-            "success": True,
-            "match": {
-                "id": match.id,
-                "team1_id": match.team1_id,
-                "team2_id": match.team2_id,
-                "team1_score": match.team1_score,
-                "team2_score": match.team2_score,
-                "winner": match.winner.name if match.winner else None,
-                "is_ongoing": match.is_ongoing,
-                "order": match.order  # Include order in response
-            }
-        }
-    except Exception as e:
-        db.rollback()
-        logger.error(f"Error updating match: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
-
-@app.get("/admin/get_match/{match_id}")
-async def get_match(match_id: int, db: Session = Depends(get_db)):
-    match = db.query(Match).filter(Match.id == match_id).first()
-    if not match:
-        raise HTTPException(status_code=404, detail="Match not found")
-    return {
-        "id": match.id,
-        "team1_score": match.team1_score,
-        "team2_score": match.team2_score,
-        "winner_id": match.winner_id,
-        "is_ongoing": match.is_ongoing,
-        "status": match.status
-    }
-
 @app.get("/betting/{tournament_id}", response_class=HTMLResponse)
 async def betting_page(request: Request, tournament_id: int, db: Session = Depends(get_db)):
     tournament = db.query(Tournament).filter(Tournament.id == tournament_id).first()
@@ -874,100 +810,26 @@ async def get_round_matches(round_id: int, db: Session = Depends(get_db)):
         # Get all teams for the tournament
         available_teams = db.query(Team).filter(Team.tournament_id == tournament.id).all()
         
-        # Check if this is the final round
-        is_final_round = round.round_number == len(tournament.rounds)
-        
         match_data = []
         for match in matches:
             match_data.append({
-                "id": match.id,
-                "team1": {"id": match.team1.id, "name": match.team1.name} if match.team1 else None,
-                "team2": {"id": match.team2.id, "name": match.team2.name} if match.team2 else None,
-                "winner_id": match.winner_id,
-                "is_bye": match.is_bye,
-                "bye_description": match.bye_description,
-                "is_third_place": match.is_third_place,
-                "available_teams": [{"id": team.id, "name": team.name} for team in available_teams],
-                "is_final_round": is_final_round,
-                "order": match.order,
-                "team1_id": match.team1_id,  # Add these explicit IDs
-                "team2_id": match.team2_id   # Add these explicit IDs
-            })
-            
-        # Sort the matches by order before returning
-        match_data.sort(key=lambda x: x["order"])
-        return match_data
-        
-    except Exception as e:
-        logger.error(f"Error getting round matches: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
-
-@app.post("/admin/match/{match_id}/update")
-async def update_match(
-    match_id: int,
-    winner_name: Optional[str] = Body(None),
-    team1_score: Optional[int] = Body(None),
-    team2_score: Optional[int] = Body(None),
-    is_ongoing: Optional[bool] = Body(None),
-    team1_id: Optional[int] = Body(None),
-    team2_id: Optional[int] = Body(None),
-    db: Session = Depends(get_db)
-):
-    try:
-        match = db.query(Match).filter(Match.id == match_id).first()
-        if not match:
-            raise HTTPException(status_code=404, detail="Match not found")
-        
-        # Store original order
-        original_order = match.order
-        
-        # Update fields if provided
-        if team1_id is not None:
-            match.team1_id = team1_id
-        if team2_id is not None:
-            match.team2_id = team2_id
-        if team1_score is not None:
-            match.team1_score = team1_score
-        if team2_score is not None:
-            match.team2_score = team2_score
-        
-        if winner_name:
-            winner = db.query(Team).filter(
-                (Team.id == match.team1_id) | (Team.id == match.team2_id), 
-                Team.name == winner_name
-            ).first()
-            if winner:
-                match.winner_id = winner.id
-                match.status = MatchStatus.COMPLETED
-        elif winner_name == "":
-            match.winner_id = None
-            match.status = MatchStatus.PENDING
-        
-        if is_ongoing is not None:
-            match.is_ongoing = is_ongoing
-            
-        # Ensure order remains unchanged
-        match.order = original_order
-        
-        db.commit()
-        db.refresh(match)
-        
-        return {
-            "success": True,
-            "match": {
                 "id": match.id,
                 "team1_id": match.team1_id,
                 "team2_id": match.team2_id,
                 "team1_score": match.team1_score,
                 "team2_score": match.team2_score,
-                "winner": match.winner.name if match.winner else None,
-                "is_ongoing": match.is_ongoing,
-                "order": match.order  # Include order in response
-            }
-        }
+                "winner_id": match.winner_id,
+                "is_bye": match.is_bye,
+                "bye_description": match.bye_description,
+                "is_third_place": match.is_third_place,
+                "available_teams": [{"id": team.id, "name": team.name} for team in available_teams],
+                "order": match.order
+            })
+            
+        return match_data
+        
     except Exception as e:
-        db.rollback()
-        logger.error(f"Error updating match: {str(e)}")
+        logger.error(f"Error getting round matches: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/admin/match/{match_id}/delete")

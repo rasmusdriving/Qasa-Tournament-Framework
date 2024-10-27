@@ -56,15 +56,12 @@
             display: flex;
             flex-direction: row;
             justify-content: space-between;
-            width: auto;
-            /* Allow width to adjust */
-            background: linear-gradient(135deg, #16213e 0%, #1a1a2e 100%);
-            border-radius: 0.25rem;
-            padding: 0.5rem;
-            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
-            margin: 0.25rem 0;
             align-items: center;
-            /* Center content vertically */
+            gap: 1rem;
+            padding: 1rem;
+            background: linear-gradient(135deg, #16213e 0%, #1a1a2e 100%);
+            border-radius: 0.5rem;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
         }
 
         .match-card.finals {
@@ -77,10 +74,12 @@
             display: flex;
             flex-direction: column;
             align-items: center;
-            padding: 0.1rem;
+            padding: 0.5rem;
             margin: 0.1rem;
-            border-radius: 0.1rem;
+            border-radius: 0.25rem;
             background: rgba(255, 255, 255, 0.05);
+            min-width: 180px;
+            /* Add minimum width */
         }
 
         .team-name {
@@ -91,21 +90,39 @@
         .player-cards {
             display: flex;
             gap: 0.5rem;
-            /* Adjust gap between player cards */
-        }
-
-        .team-score {
-            font-size: 1rem;
-            font-weight: 700;
-            color: #4CAF50;
-            margin-left: auto;
+            margin-bottom: 0.5rem;
+            flex-wrap: wrap;
+            /* Allow cards to wrap if needed */
+            justify-content: center;
         }
 
         .player-card {
             width: 80px;
-            /* Increase size */
             height: 80px;
-            /* Increase size */
+            flex-shrink: 0;
+            /* Prevent shrinking */
+            position: relative;
+            /* Add this */
+        }
+
+        .player-card img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            border-radius: 0.25rem;
+        }
+
+        .team-score {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: #4CAF50;
+            text-align: center;
+            padding: 0.25rem;
+            margin-top: 0.5rem;
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 0.25rem;
+            width: 100%;
+            text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.5);
         }
 
         .round-bye-matches {
@@ -123,13 +140,11 @@
         }
 
         .vs-text {
-            display: flex;
-            align-items: center;
-            justify-content: center;
             font-size: 1.2rem;
             font-weight: bold;
             color: #e6e6e6;
-            margin: 0 10px;
+            padding: 0 1rem;
+            flex-shrink: 0;
         }
     </style>
 </head>
@@ -233,33 +248,20 @@
 
             function renderTeam(team, score, isWinner, isFinalRound = false) {
                 const placeholderImage = isFinalRound ? 'finally_placeholder.png' : 'TBD.png';
-
-                if (!team) {
-                    return `
-                        <div class="team-container tbd-placeholder">
-                            <div class="team-name">TBD</div>
-                            <div class="player-cards">
-                                <div class="player-card">
-                                    <img src="/static/player_images/${placeholderImage}" alt="TBD">
-                                </div>
-                            </div>
-                            <div class="team-score">0</div>
-                        </div>
-                    `;
-                }
-
                 return `
-                    <div class="team-container">
-                        <div class="team-name">${team.name}</div>
+                    <div class="team-container ${isWinner ? 'winner' : ''}">
                         <div class="player-cards">
-                            ${team.players.map(player => `
+                            ${team ? team.players.map(player => `
                                 <div class="player-card">
                                     <img src="/static/player_images/${player.name}.png" alt="${player.name}">
                                 </div>
-                            `).join('')}
+                            `).join('') : `
+                                <div class="player-card">
+                                    <img src="/static/player_images/${placeholderImage}" alt="TBD">
+                                </div>
+                            `}
                         </div>
-                        <div class="team-score">${score || '0'}</div>
-                        ${isWinner ? '<div class="winner-indicator"></div>' : ''}
+                        <div class="team-score">${score !== undefined ? score : '0'}</div>
                     </div>
                 `;
             }
